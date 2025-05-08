@@ -148,6 +148,9 @@ class WebViewFragment : Fragment() {
             initialUrl = it.getString(ARG_URL, "").normalizeUrl()
         }
         
+        Log.d(TAG, "onCreate: TabID=$tabId, URL=$initialUrl")
+        setHasOptionsMenu(true) // Fragment'in opsiyon menüsü olduğunu belirt
+        
         // Performans optimizasyon sınıflarını başlat
         context?.let { ctx ->
             performanceOptimizer = PerformanceOptimizer.getInstance(ctx)
@@ -164,7 +167,12 @@ class WebViewFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        Log.d(TAG, "onCreateView: TabID=$tabId, URL=$initialUrl")
+        
+        // Yeni bir binding oluştur - her zaman temiz bir WebView kullan
         _binding = FragmentWebViewBinding.inflate(inflater, container, false)
+        Log.d(TAG, "onCreateView: Yeni binding oluşturuldu")
+        
         return binding.root
     }
     
@@ -172,11 +180,22 @@ class WebViewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
-        setupWebView()
+        Log.d(TAG, "onViewCreated: TabID=$tabId, SavedInstanceState=${savedInstanceState != null}")
+        
+        // WebView'in zaten yapılandırılıp yapılandırılmadığını kontrol et
+        if (binding.webView.settings.javaScriptEnabled) {
+            Log.d(TAG, "onViewCreated: WebView zaten yapılandırılmış")
+        } else {
+            Log.d(TAG, "onViewCreated: WebView yapılandırılıyor")
+            setupWebView()
+        }
         
         // WebView'ı son bilinen konuma yükle, eğer yeni sekme ise initialUrl'e git
-        if (savedInstanceState == null) {
+        if (savedInstanceState == null && binding.webView.url.isNullOrEmpty()) {
+            Log.d(TAG, "onViewCreated: initialUrl yükleniyor: $initialUrl")
             loadUrl(initialUrl)
+        } else {
+            Log.d(TAG, "onViewCreated: Mevcut URL korunuyor: ${binding.webView.url}")
         }
     }
     
@@ -184,6 +203,12 @@ class WebViewFragment : Fragment() {
         binding.webView.apply {
             // WebView ayarlarını yapılandır
             configure()
+            
+            // WebView instance ID'sini logla (debug için)
+            Log.d(TAG, "setupWebView: WebView Instance=${System.identityHashCode(this)}, TabID=$tabId")
+            
+            // Render modunu hardware olarak ayarla
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             
             // Tüm performans optimizasyonlarını uygula
             Log.d(TAG, "WebView için performans optimizasyonları uygulanıyor")
@@ -308,11 +333,34 @@ class WebViewFragment : Fragment() {
     
     fun loadUrl(url: String) {
         val normalizedUrl = url.normalizeUrl()
-        binding.webView.loadUrl(normalizedUrl)
+        Log.d(TAG, "loadUrl: TabID=$tabId, URL=$normalizedUrl")
         
-        // Sayfa yükleme performansını izle
-        performanceOptimizer.collectPerformanceMetrics(binding.webView) { metrics ->
-            Log.d(TAG, "Sayfa performans metrikleri: $metrics")
+        // WebView'in mevcut URL'ini kontrol et 
+        val currentUrl = binding.webView.url
+        if (currentUrl == normalizedUrl) {
+            Log.d(TAG, "loadUrl: URL zaten yüklü: $normalizedUrl")
+            return
+        }
+        
+        try {
+            // WebView henüz başlamadıysa veya kullanılamaz durumdaysa
+            if (!binding.webView.isActivated || binding.webView.settings == null) {
+                Log.w(TAG, "loadUrl: WebView henüz hazır değil, yeniden başlatılıyor")
+                setupWebView() // WebView'i yeniden yapılandır
+            }
+            
+            // URL'yi yükle
+            binding.webView.loadUrl(normalizedUrl)
+            
+            // URL yüklendiğini logla
+            Log.d(TAG, "loadUrl: URL yüklendi: $normalizedUrl")
+            
+            // Sayfa yükleme performansını izle
+            performanceOptimizer.collectPerformanceMetrics(binding.webView) { metrics ->
+                Log.d(TAG, "Sayfa performans metrikleri: $metrics")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "loadUrl: Hata: URL yüklenemedi: $normalizedUrl", e)
         }
     }
     
@@ -342,8 +390,42 @@ class WebViewFragment : Fragment() {
     
     override fun onDestroyView() {
         super.onDestroyView()
+        Log.d(TAG, "onDestroyView: TabID=$tabId, URL=${binding.webView.url}")
         binding.webView.stopLoading()
+        
+        // WebView'i temizle ve _binding'i null yap
+        // Böylece fragment yeniden oluşturulduğunda yeni bir WebView oluşturulur
         _binding = null
+        
+        Log.d(TAG, "onDestroyView: WebView temizlendi")
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "onResume: TabID=$tabId, URL=${binding.webView.url}")
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        Log.d(TAG, "onPause: TabID=$tabId, URL=${binding.webView.url}")
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "onDestroy: TabID=$tabId")
+        
+        // Kaynakları serbest bırak
+        if (_binding != null) {
+            try {
+                binding.webView.stopLoading()
+                binding.webView.destroy()
+                Log.d(TAG, "onDestroy: WebView imha edildi")
+            } catch (e: Exception) {
+                Log.e(TAG, "onDestroy: WebView imha edilirken hata oluştu", e)
+            } finally {
+                _binding = null
+            }
+        }
     }
     
     interface BrowserCallback {

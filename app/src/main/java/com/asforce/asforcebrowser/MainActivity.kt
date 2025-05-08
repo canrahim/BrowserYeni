@@ -20,6 +20,7 @@ import com.asforce.asforcebrowser.presentation.browser.TabAdapter
 import com.asforce.asforcebrowser.presentation.browser.WebViewFragment
 import com.asforce.asforcebrowser.presentation.main.MainViewModel
 import com.asforce.asforcebrowser.util.normalizeUrl
+import com.asforce.asforcebrowser.util.viewpager.ViewPager2Optimizer
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -38,6 +39,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     
     private lateinit var tabAdapter: TabAdapter
     private lateinit var pagerAdapter: BrowserPagerAdapter
+    
+    // ViewPager2 optimizasyonu için
+    private lateinit var viewPagerOptimizer: ViewPager2Optimizer
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,12 +64,16 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     }
     
     private fun setupAdapters() {
+        // ViewPager2 optimizer'i başlat
+        viewPagerOptimizer = ViewPager2Optimizer(this)
         // Sekmeler için RecyclerView
         tabAdapter = TabAdapter(
             onTabSelected = { tab ->
+                android.util.Log.d("MainActivity", "Sekme seçildi: ID=${tab.id}, URL=${tab.url}")
                 viewModel.setActiveTab(tab.id)
             },
             onTabClosed = { tab ->
+                android.util.Log.d("MainActivity", "Sekme kapatıldı: ID=${tab.id}")
                 viewModel.closeTab(tab)
             }
         )
@@ -117,20 +125,49 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         
         // ViewPager adaptörünü ayarla
         pagerAdapter = BrowserPagerAdapter(this)
+        
+        // ViewPager2 yapılandırması
         binding.viewPager.adapter = pagerAdapter
+        
+        // ViewPager2 optimize edici ile yapılandırma
+        viewPagerOptimizer.optimizeViewPager(binding.viewPager, pagerAdapter)
+        
+        // ViewPager2'nin fragment yönetimini güncelleme
+        android.util.Log.d("MainActivity", "ViewPager2 yapılandırması tamamlandı")
         
         // ViewPager sayfa değişim dinleyicisi
         binding.viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
+                android.util.Log.d("MainActivity", "ViewPager sayfa seçildi: $position")
+                
                 pagerAdapter.getTabAt(position)?.let { tab ->
+                    android.util.Log.d("MainActivity", "Seçilen tab: ID=${tab.id}, Active=${tab.isActive}, URL=${tab.url}")
+                    
                     if (!tab.isActive) {
+                        android.util.Log.d("MainActivity", "Tab aktif değil, aktif yapılıyor: ${tab.id}")
                         viewModel.setActiveTab(tab.id)
                     }
+                    
+                    // WebView fragmentini kontrol et
+                    val fragment = pagerAdapter.getFragmentByTabId(tab.id)
+                    android.util.Log.d("MainActivity", "Seçilen fragment: ${fragment != null}")
                     
                     // Adres çubuğunu güncelle
                     viewModel.updateAddressBar(tab.url)
                 }
+            }
+            
+            override fun onPageScrollStateChanged(state: Int) {
+                super.onPageScrollStateChanged(state)
+                // Kaydırma durumu - 0: boşta, 1: sürüklüyor, 2: ayarlı
+                val stateText = when(state) {
+                    ViewPager2.SCROLL_STATE_IDLE -> "Boşta"
+                    ViewPager2.SCROLL_STATE_DRAGGING -> "Sürüklüyor"
+                    ViewPager2.SCROLL_STATE_SETTLING -> "Ayarlanıyor"
+                    else -> "Bilinmeyen"
+                }
+                android.util.Log.d("MainActivity", "ViewPager kaydırma durumu değişti: $stateText")
             }
         })
     }
@@ -215,6 +252,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // Sekme listesini gözlemle
         lifecycleScope.launch {
             viewModel.tabs.collectLatest { tabs ->
+                android.util.Log.d("MainActivity", "Sekme listesi güncellendi: ${tabs.size} sekme")
                 tabAdapter.updateTabs(tabs)
                 pagerAdapter.updateTabs(tabs)
             }
@@ -224,11 +262,38 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         lifecycleScope.launch {
             viewModel.activeTab.collectLatest { activeTab ->
                 activeTab?.let {
+                    android.util.Log.d("MainActivity", "Aktif sekme değişti: ID=${it.id}, URL=${it.url}")
                     val position = pagerAdapter.getPositionForTabId(it.id)
-                    if (position != -1 && binding.viewPager.currentItem != position) {
-                        binding.viewPager.setCurrentItem(position, true)
+                    
+                    if (position != -1) {
+                        // Mevcut pozisyondan farklı ise, görünümü güncelle
+                        if (binding.viewPager.currentItem != position) {
+                            android.util.Log.d("MainActivity", "ViewPager pozisyonu değiştiriliyor: $position")
+                            
+                            // Optimize edilmiş tab geçişi - zorla yeniden yükleme
+                            viewPagerOptimizer.setCurrentTabForceRefresh(binding.viewPager, position)
+                        }
+                        
+                        // Fragment geçişlerini izle
+                        viewPagerOptimizer.monitorFragmentSwitching(
+                            binding.viewPager,
+                            pagerAdapter.fragments,
+                            it.id
+                        ) { fragment ->
+                            // Doğru fragment seçildiğinde yapacaklar
+                            android.util.Log.d("MainActivity", "Fragmente geçildi: TabID=${it.id}")
+                        }
+                        
+                        // WebView'u kontrol et ve güncelle
+                        val fragment = pagerAdapter.getFragmentByTabId(it.id)
+                        android.util.Log.d("MainActivity", "Aktif sekme fragment: ${fragment != null}")
+                    } else {
+                        android.util.Log.e("MainActivity", "Hata: Aktif sekme için geçersiz pozisyon: ${it.id}")
+                        // Adapter'i yenileme için zorla
+                        viewPagerOptimizer.refreshViewPager(binding.viewPager)
                     }
                     
+                    // Adres çubuğunu güncelle
                     viewModel.updateAddressBar(it.url)
                 }
             }
