@@ -5,6 +5,7 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/white"
     tools:context=".MainActivity">
 
     <!-- Üst Araç Çubuğu -->
@@ -12,6 +13,9 @@
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@color/toolbarBackground"
+        android:elevation="4dp"
+        app:elevation="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -21,88 +25,154 @@
             android:layout_height="wrap_content">
 
             <!-- Adres Çubuğu -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/addressBarLayout"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/addressBarContainer"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="12dp"
                 android:layout_marginTop="8dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="8dp"
-                app:endIconMode="clear_text"
-                app:layout_constraintBottom_toTopOf="@+id/tabsRecyclerView"
-                app:layout_constraintEnd_toStartOf="@+id/menuButton"
-                app:layout_constraintStart_toEndOf="@+id/backButton"
+                android:layout_marginEnd="12dp"
+                app:cardBackgroundColor="@color/addressBarBackground"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/addressBarBorder"
+                app:strokeWidth="1dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/addressBar"
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="URL girin"
-                    android:imeOptions="actionGo"
-                    android:inputType="textUri"
-                    android:selectAllOnFocus="true"
-                    android:singleLine="true" />
+                    android:layout_height="match_parent">
 
-            </com.google.android.material.textfield.TextInputLayout>
+                    <!-- Menü Butonu -->
+                    <ImageButton
+                        android:id="@+id/menuOpenButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Menü"
+                        android:padding="9dp"
+                        android:src="@drawable/ic_menu"
+                        android:tint="@color/iconTint"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- Geri Butonu -->
-            <ImageButton
-                android:id="@+id/backButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginStart="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Geri"
-                android:src="@drawable/ic_arrow_back"
-                app:layout_constraintBottom_toBottomOf="@+id/addressBarLayout"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="@+id/addressBarLayout" />
+                    <!-- Geri Butonu -->
+                    <ImageButton
+                        android:id="@+id/backButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Geri"
+                        android:padding="9dp"
+                        android:src="@drawable/ic_arrow_back"
+                        android:tint="@color/iconTint"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toEndOf="@+id/menuOpenButton"
+                        app:layout_constraintTop_toTopOf="parent" />
+                        
+                    <!-- İleri Butonu -->
+                    <ImageButton
+                        android:id="@+id/forwardButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="İleri"
+                        android:padding="9dp"
+                        android:src="@drawable/ic_arrow_forward"
+                        android:tint="@color/iconTint"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toEndOf="@+id/backButton"
+                        app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- Menü Butonu -->
-            <ImageButton
-                android:id="@+id/menuButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Menü"
-                android:src="@drawable/ic_more_vert"
-                app:layout_constraintBottom_toBottomOf="@+id/addressBarLayout"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@+id/addressBarLayout" />
+                    <!-- Adres Çubuğu (EditText) -->
+                    <EditText
+                        android:id="@+id/addressBar"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@null"
+                        android:hint="Ara veya URL girin"
+                        android:imeOptions="actionGo"
+                        android:inputType="textUri"
+                        android:selectAllOnFocus="true"
+                        android:singleLine="true"
+                        android:textColor="@color/tabTextActive"
+                        android:textColorHint="@color/tabTextInactive"
+                        android:textSize="15sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@+id/menuButton"
+                        app:layout_constraintStart_toEndOf="@+id/forwardButton"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <!-- Menü Butonu -->
+                    <ImageButton
+                        android:id="@+id/menuButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Menü"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_more_vert"
+                        android:tint="@color/iconTint"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </com.google.android.material.card.MaterialCardView>
+            
+            <!-- Sekmeleri ayıran çizgi -->
+            <View
+                android:id="@+id/tabsDivider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="8dp"
+                android:background="@color/dividerColor"
+                app:layout_constraintTop_toBottomOf="@+id/addressBarContainer" />
 
             <!-- Sekmeler için RecyclerView -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/tabsRecyclerView"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:clipToPadding="false"
                 android:orientation="horizontal"
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp"
                 app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
                 app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toStartOf="@+id/newTabButton"
+                app:layout_constraintEnd_toStartOf="@+id/newTabButtonContainer"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/addressBarLayout"
+                app:layout_constraintTop_toBottomOf="@+id/tabsDivider"
                 tools:listitem="@layout/item_tab" />
 
             <!-- Yeni Sekme Butonu -->
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/newTabButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/newTabButtonContainer"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_marginEnd="8dp"
-                android:contentDescription="Yeni Sekme"
-                app:backgroundTint="@color/white"
-                app:fabCustomSize="40dp"
+                app:cardBackgroundColor="@color/colorPrimary"
+                app:cardCornerRadius="18dp"
+                app:cardElevation="0dp"
                 app:layout_constraintBottom_toBottomOf="@+id/tabsRecyclerView"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@+id/tabsRecyclerView"
-                app:srcCompat="@drawable/ic_add" />
+                app:layout_constraintTop_toTopOf="@+id/tabsRecyclerView">
+                
+                <ImageButton
+                    android:id="@+id/newTabButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Yeni Sekme"
+                    android:padding="6dp"
+                    android:tint="@color/white"
+                    android:src="@drawable/ic_add" />
+            </com.google.android.material.card.MaterialCardView>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -119,13 +189,15 @@
         app:layout_constraintTop_toBottomOf="@+id/appBarLayout" />
 
     <!-- İlerleme Göstergesi -->
-    <ProgressBar
+    <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/progressBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="0dp"
-        android:layout_height="3dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:indeterminate="true"
         android:visibility="gone"
+        app:indicatorColor="@color/colorPrimary"
+        app:trackColor="@color/addressBarBackground"
+        app:trackThickness="3dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/appBarLayout" />

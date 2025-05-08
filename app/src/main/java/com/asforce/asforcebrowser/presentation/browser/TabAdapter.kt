@@ -64,8 +64,19 @@ class TabAdapter(
                 // Favicon ayarla (gerçek uygulamada favicon'u yükleyebilirsiniz)
                 favicon.setImageResource(R.drawable.ic_add)
                 
-                // Aktif sekmeyi vurgula
+                // Aktif sekme durumunu ayarla
                 root.isSelected = isActive
+                
+                // Aktif sekme için metin ve icon renklerini ayarla
+                if (isActive) {
+                    tabTitle.setTextColor(root.context.getColor(R.color.tabTextActive))
+                    favicon.setColorFilter(root.context.getColor(R.color.iconTintActive))
+                    closeButton.setColorFilter(root.context.getColor(R.color.iconTintActive))
+                } else {
+                    tabTitle.setTextColor(root.context.getColor(R.color.tabTextInactive))
+                    favicon.setColorFilter(root.context.getColor(R.color.iconTint))
+                    closeButton.setColorFilter(root.context.getColor(R.color.iconTint))
+                }
                 
                 // Tıklama işleyicileri
                 root.setOnClickListener {

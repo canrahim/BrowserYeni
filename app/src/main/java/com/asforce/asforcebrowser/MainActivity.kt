@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     }
     
     private fun setupAdapters() {
-        // Sekme adaptörünü ayarla
+        // Sekmeler için RecyclerView
         tabAdapter = TabAdapter(
             onTabSelected = { tab ->
                 viewModel.setActiveTab(tab.id)
@@ -138,26 +138,40 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     private fun setupListeners() {
         // Adres çubuğu dinleyicisi
         binding.addressBar.setOnEditorActionListener { _, actionId, event ->
-            if (actionId == EditorInfo.IME_ACTION_GO ||
-                (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
-                
-                val url = binding.addressBar.text.toString().normalizeUrl()
-                loadUrl(url)
-                true
-            } else {
-                false
-            }
+        if (actionId == EditorInfo.IME_ACTION_GO ||
+        (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
+        
+        val url = binding.addressBar.text.toString().normalizeUrl()
+        loadUrl(url)
+        true
+        } else {
+        false
+        }
         }
         
         // Geri butonu dinleyicisi
         binding.backButton.setOnClickListener {
             val currentTab = viewModel.activeTab.value ?: return@setOnClickListener
-            val position = pagerAdapter.getPositionForTabId(currentTab.id)
             val fragment = pagerAdapter.getFragmentByTabId(currentTab.id)
             
             if (fragment?.canGoBack() == true) {
                 fragment.goBack()
             }
+        }
+        
+        // İleri butonu dinleyicisi
+        binding.forwardButton.setOnClickListener {
+            val currentTab = viewModel.activeTab.value ?: return@setOnClickListener
+            val fragment = pagerAdapter.getFragmentByTabId(currentTab.id)
+            
+            if (fragment?.canGoForward() == true) {
+                fragment.goForward()
+            }
+        }
+        
+        // Menü açma butonu dinleyicisi
+        binding.menuOpenButton.setOnClickListener { view ->
+            showBrowserMenu(view)
         }
         
         // Yeni sekme butonu dinleyicisi

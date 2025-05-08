@@ -3,49 +3,58 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_marginHorizontal="4dp"
+    android:layout_height="32dp"
+    android:layout_marginStart="1dp"
+    android:layout_marginEnd="1dp"
+    android:minWidth="110dp"
+    android:maxWidth="200dp"
     android:background="@drawable/tab_background"
     android:paddingStart="8dp"
-    android:paddingTop="4dp"
     android:paddingEnd="4dp"
-    android:paddingBottom="4dp">
+    android:elevation="0.5dp">
 
     <ImageView
         android:id="@+id/favicon"
         android:layout_width="16dp"
         android:layout_height="16dp"
-        android:layout_marginEnd="4dp"
         android:contentDescription="Site Favicon"
-        app:layout_constraintBottom_toBottomOf="@+id/tabTitle"
+        android:tint="@color/iconTint"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/tabTitle"
+        app:layout_constraintTop_toTopOf="parent"
         tools:src="@drawable/ic_add" />
 
     <TextView
         android:id="@+id/tabTitle"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="2dp"
         android:ellipsize="end"
-        android:maxWidth="140dp"
         android:maxLines="1"
+        android:textColor="@color/tabTextInactive"
         android:textSize="12sp"
+        android:fontFamily="sans-serif"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/closeButton"
         app:layout_constraintStart_toEndOf="@+id/favicon"
         app:layout_constraintTop_toTopOf="parent"
         tools:text="Google Arama" />
 
     <ImageButton
         android:id="@+id/closeButton"
-        android:layout_width="16dp"
-        android:layout_height="16dp"
-        android:layout_marginStart="4dp"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_marginEnd="2dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="Sekmeyi Kapat"
+        android:padding="1dp"
+        android:scaleType="fitXY"  
+        android:tint="@color/iconTint"  
         android:src="@drawable/ic_close"
-        app:layout_constraintBottom_toBottomOf="@+id/tabTitle"
-        app:layout_constraintStart_toEndOf="@+id/tabTitle"
-        app:layout_constraintTop_toTopOf="@+id/tabTitle" />
+        android:alpha="0.7"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -2,4 +2,25 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    
+    <!-- Ana tema renkleri -->
+    <color name="colorPrimary">#4285F4</color>
+    <color name="colorPrimaryDark">#3367D6</color>
+    <color name="colorAccent">#8AB4F8</color>
+    
+    <!-- Sekme renkleri -->
+    <color name="tabBackground">#FFFFFF</color>
+    <color name="tabBackgroundInactive">#F5F5F5</color>
+    <color name="tabBorderActive">#4285F4</color>
+    <color name="tabBorderInactive">#E0E0E0</color>
+    <color name="tabTextActive">#202124</color>
+    <color name="tabTextInactive">#5F6368</color>
+    
+    <!-- Arayüz renkleri -->
+    <color name="toolbarBackground">#FFFFFF</color>
+    <color name="addressBarBackground">#F8F9FA</color>
+    <color name="addressBarBorder">#DADCE0</color>
+    <color name="dividerColor">#E8EAED</color>
+    <color name="iconTint">#5F6368</color>
+    <color name="iconTintActive">#4285F4</color>
 </resources>
