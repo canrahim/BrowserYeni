@@ -4,13 +4,18 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.webkit.*
 import androidx.core.os.bundleOf
+import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import kotlin.math.abs
 import com.asforce.asforcebrowser.databinding.FragmentWebViewBinding
 import com.asforce.asforcebrowser.util.configure
 import com.asforce.asforcebrowser.util.normalizeUrl
@@ -157,7 +162,100 @@ class WebViewFragment : Fragment() {
             
             // SwipeRefreshLayout ile entegre et
             setupWithSwipeRefresh(binding.swipeRefresh)
+            
+            // Optimal kaydırma için özelleştirme
+            setupOptimizedScrolling()
         }
+    }
+    
+    /**
+     * WebView için optimize edilmiş kaydırma davranışı ayarlar
+     * 
+     * Kademeli kaydırma yerine daha akıcı ve daha hızlı tepki veren bir deneyim sağlar.
+     * Referans: Android Touch Events ve Scroll Physics
+     */
+    private fun WebView.setupOptimizedScrolling() {
+        val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+        var lastX = 0f
+        var lastY = 0f
+        var scrolling = false
+        var velocityTracker: VelocityTracker? = null
+        
+        // WebView kaydırma hızını optimize etmek için dokunma olaylarını özelleştir
+        setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    lastX = event.x
+                    lastY = event.y
+                    scrolling = false
+                    parent.requestDisallowInterceptTouchEvent(true)
+                    
+                    // Hız izleme başlat
+                    if (velocityTracker == null) {
+                        velocityTracker = VelocityTracker.obtain()
+                    } else {
+                        velocityTracker?.clear()
+                    }
+                    velocityTracker?.addMovement(event)
+                    
+                    // Devam eden tüm kaydırma ivmeleri durdurul
+                    flingScroll(0, 0)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    velocityTracker?.addMovement(event)
+                    
+                    val deltaX = abs(event.x - lastX)
+                    val deltaY = abs(event.y - lastY)
+                    
+                    // Dikey kaydırma başladı mı?
+                    if (!scrolling && deltaY > touchSlop && deltaY > deltaX * 2) {
+                        scrolling = true
+                        
+                        // Kademeli kaydırma yerine hızlı ve akıcı kaydırma için nested scrolling özelliği etkinleştir
+                        ViewCompat.setNestedScrollingEnabled(this, true)
+                    }
+                    
+                    // Yatay kaydırma için üst view'a olayları ilet
+                    if (scrolling && deltaX > deltaY * 1.5f) {
+                        parent.requestDisallowInterceptTouchEvent(false)
+                    }
+                    
+                    lastX = event.x
+                    lastY = event.y
+                }
+                MotionEvent.ACTION_UP -> {
+                    // İvmeyi hesapla ve daha iyi bir "fling" elde et
+                    velocityTracker?.apply {
+                        computeCurrentVelocity(1000) // Birim: piksel/saniye
+                        val yVelocity = -getYVelocity() // Y yönünü tersine çevir
+                        
+                        // Sadece yeterince hızlı dokunma hareketlerinde fling uygula
+                        if (abs(yVelocity) > 500) {
+                            // WebView'a yavaş bir ivme ile kaydırma hareketi başlat
+                            // Bu, daha doğal bir kaydırma sağlar
+                            flingScroll(0, (yVelocity / 1.5).toInt())
+                        }
+                    }
+                    scrolling = false
+                    velocityTracker?.recycle()
+                    velocityTracker = null
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    scrolling = false
+                    velocityTracker?.recycle()
+                    velocityTracker = null
+                }
+            }
+            
+            // WebView için false döndürerek dokunma olaylarının WebView tarafından da işlenmesini sağlar
+            // Bu, hem bizim özel işlememize hem de varsayılan WebView davranışına olanak tanır
+            false
+        }
+        
+        // Kaydırma davranışını geliştirmek için bazı ek ayarlamalar
+        isFocusableInTouchMode = true
+        isHorizontalScrollBarEnabled = false
+        isVerticalScrollBarEnabled = false
     }
     
     fun loadUrl(url: String) {
