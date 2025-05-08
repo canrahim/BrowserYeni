@@ -83,26 +83,28 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                 val fromPos = viewHolder.bindingAdapterPosition
                 val toPos = target.bindingAdapterPosition
                 
-                // Sekme listesini güncelle
-                val tabs = viewModel.tabs.value.toMutableList()
-                if (fromPos < toPos) {
-                    for (i in fromPos until toPos) {
-                        val updatedTab1 = tabs[i].copy(position = i+1)
-                        val updatedTab2 = tabs[i+1].copy(position = i)
-                        tabs[i] = updatedTab2
-                        tabs[i+1] = updatedTab1
-                    }
-                } else {
-                    for (i in fromPos downTo toPos + 1) {
-                        val updatedTab1 = tabs[i].copy(position = i-1)
-                        val updatedTab2 = tabs[i-1].copy(position = i)
-                        tabs[i] = updatedTab2
-                        tabs[i-1] = updatedTab1
-                    }
+                // Geçersiz pozisyon kontrolü
+                if (fromPos < 0 || toPos < 0 || fromPos >= viewModel.tabs.value.size || toPos >= viewModel.tabs.value.size) {
+                    return false
                 }
                 
-                // Sekme pozisyonlarını güncelle
-                viewModel.updateTabPositions(tabs)
+                // Sekme listesini güncelle
+                val tabs = viewModel.tabs.value.toMutableList()
+                
+                // Taşınan öğeyi geçici olarak al
+                val movedTab = tabs[fromPos]
+                
+                // Listeyi düzenle - öğeyi kaldırıp hedef konuma ekle
+                tabs.removeAt(fromPos)
+                tabs.add(toPos, movedTab)
+                
+                // Tüm sekmelerin position özelliklerini güncelle
+                val updatedTabs = tabs.mapIndexed { index, tab ->
+                    tab.copy(position = index)
+                }
+                
+                // Sekme pozisyonlarını veritabanında güncelle
+                viewModel.updateTabPositions(updatedTabs)
                 
                 return true
             }

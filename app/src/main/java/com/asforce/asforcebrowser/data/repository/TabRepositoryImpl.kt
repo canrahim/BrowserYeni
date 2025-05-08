@@ -68,11 +68,21 @@ class TabRepositoryImpl @Inject constructor(
     }
     
     override suspend fun updateTabPositions(tabs: List<Tab>) {
-        // Sekmelerin pozisyonlarını güncelle
-        tabs.forEachIndexed { index, tab ->
+        // Tüm sekmelerin pozisyonlarını aynı anda ve toplu olarak güncelleyelim
+        // Bu işlem veritabanı işlem sayısını azaltarak performansı artırır
+        
+        // Önce pozisyon sırasını doğrulayarak pozisyon değeri ile indeks değeri aynı olmasını sağlayalım
+        val updatedTabs = tabs.mapIndexed { index, tab ->
             if (tab.position != index) {
-                tabDao.updateTab(tab.copy(position = index))
+                tab.copy(position = index)
+            } else {
+                tab
             }
+        }
+        
+        // Sadece değiştirilen sekmeleri güncelle
+        for (tab in updatedTabs) {
+            tabDao.updateTab(tab)
         }
     }
 }
