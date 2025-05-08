@@ -81,6 +81,10 @@ dependencies {
     // SwipeRefreshLayout - Aşağı çekerek yenileme
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     
+    // Glide - Resim yükleme kütüphanesi (favicon için)
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
+    
     // Test kütüphaneleri
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -110,11 +110,14 @@ class WebViewFragment : Fragment() {
         
         override fun onReceivedIcon(view: WebView?, icon: Bitmap?) {
             super.onReceivedIcon(view, icon)
-            val url = view?.url ?: initialUrl
-            val title = view?.title ?: "Yükleniyor..."
-            
-            lifecycleScope.launch {
-                viewModel.updateTab(tabId, url, title, icon)
+            if (icon != null) {
+                val url = view?.url ?: initialUrl
+                val title = view?.title ?: "Yükleniyor..."
+                
+                lifecycleScope.launch {
+                    // Favicon'u güncellemek için viewModel'i kullan
+                    viewModel.updateTab(tabId, url, title, icon)
+                }
             }
         }
         

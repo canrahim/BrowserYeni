@@ -7,6 +7,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.asforce.asforcebrowser.R
 import com.asforce.asforcebrowser.data.model.Tab
 import com.asforce.asforcebrowser.databinding.ItemTabBinding
+import com.asforce.asforcebrowser.util.FaviconManager
+import com.bumptech.glide.Glide
+import java.io.File
 
 /**
  * TabAdapter - Sekme listesi için RecyclerView adapter'ı
@@ -61,8 +64,30 @@ class TabAdapter(
                 // Sekme başlığını ayarla
                 tabTitle.text = tab.title.ifEmpty { "Yeni Sekme" }
                 
-                // Favicon ayarla (gerçek uygulamada favicon'u yükleyebilirsiniz)
-                favicon.setImageResource(R.drawable.ic_add)
+                // Favicon'u yükle
+                if (tab.faviconUrl != null) {
+                    // Favicon dosyasını yükle
+                    val faviconFile = File(root.context.filesDir, tab.faviconUrl)
+                    if (faviconFile.exists()) {
+                        // Glide ile favicon'u yükle
+                        Glide.with(root.context)
+                            .load(faviconFile)
+                            .placeholder(R.drawable.ic_globe) // Varsayılan ikon
+                            .error(R.drawable.ic_globe) // Hata durumunda gösterilecek ikon
+                            .into(favicon)
+                        
+                        // Renk filtresini kaldır (favicon'un orijinal renklerini görüntülemek için)
+                        favicon.clearColorFilter()
+                    } else {
+                        // Dosya yoksa varsayılan simgeyi göster
+                        favicon.setImageResource(R.drawable.ic_globe)
+                        setIconColorFilter(isActive)
+                    }
+                } else {
+                    // Favicon yoksa varsayılan simgeyi göster
+                    favicon.setImageResource(R.drawable.ic_globe)
+                    setIconColorFilter(isActive)
+                }
                 
                 // Aktif sekme durumunu ayarla
                 root.isSelected = isActive
@@ -70,11 +95,9 @@ class TabAdapter(
                 // Aktif sekme için metin ve icon renklerini ayarla
                 if (isActive) {
                     tabTitle.setTextColor(root.context.getColor(R.color.tabTextActive))
-                    favicon.setColorFilter(root.context.getColor(R.color.iconTintActive))
                     closeButton.setColorFilter(root.context.getColor(R.color.iconTintActive))
                 } else {
                     tabTitle.setTextColor(root.context.getColor(R.color.tabTextInactive))
-                    favicon.setColorFilter(root.context.getColor(R.color.iconTint))
                     closeButton.setColorFilter(root.context.getColor(R.color.iconTint))
                 }
                 
@@ -86,6 +109,14 @@ class TabAdapter(
                 closeButton.setOnClickListener {
                     onTabClosed(tab)
                 }
+            }
+        }
+        
+        private fun setIconColorFilter(isActive: Boolean) {
+            if (isActive) {
+                binding.favicon.setColorFilter(binding.root.context.getColor(R.color.iconTintActive))
+            } else {
+                binding.favicon.setColorFilter(binding.root.context.getColor(R.color.iconTint))
             }
         }
     }
