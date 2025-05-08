@@ -19,61 +19,67 @@ import androidx.webkit.WebViewFeature
 
 /**
  * WebView'ın temel konfigürasyonunu yapar
+ * 
+ * WebView için gerekli temel ayarları yükler, özellikle kademeli kaydırmayı engelleyecek şekilde ayarlar.
  */
 @SuppressLint("SetJavaScriptEnabled")
 fun WebView.configure() {
-    settings.apply {
-        javaScriptEnabled = true
-        domStorageEnabled = true
-        loadsImagesAutomatically = true
-        setSupportZoom(true)
-        builtInZoomControls = true
-        displayZoomControls = false
-        useWideViewPort = true
-        loadWithOverviewMode = true
-        javaScriptCanOpenWindowsAutomatically = true
-        mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-        cacheMode = WebSettings.LOAD_DEFAULT
-        
-        // Kaydırma performansı optimizasyonları
-        // Not: LayoutAlgorithm.NORMAL Android'in yeni sürümlerinde önerilmiyor
-        // Bunun yerine varsayılan WebView davranışı daha iyi
-        
-        // Donanım hızlandırma ve performans ayarları
-        databaseEnabled = true
-        allowContentAccess = true
-        setNeedInitialFocus(false) // Gereksiz odaklanmayı önle
-        blockNetworkImage = false // Resimleri bloklama
-        
-        // Bellek kullanımı optimizasyonu
-        // Not: setAppCacheEnabled metodu Android'in yeni sürümlerinde kaldırılmıştır
-        // Modern tarayıcı önbelleği için cacheMode ve domStorage kullanılır
-        cacheMode = WebSettings.LOAD_DEFAULT // Önbelleği etkin bir şekilde kullan
-        domStorageEnabled = true // LocalStorage desteği 
-        
-        // Kaydırma optimizasyonu ayarları
-        // Not: setSaveFormData Android'in yeni sürümlerinde önerilmiyor
-        allowFileAccess = true
-        
-        // CSS hızlandırma
-        // Not: setRenderPriority Android'in yeni sürümlerinde kaldırılmıştır
-        // Bunun yerine GPU ve donanım hızlandırma özellikleri kullanılır
+    // Kritik - donanım hızlandırma katmanını ayarla (kaydırma için önemli)
+    setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
-        // Koyu mod desteği (varsa)
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-            WebSettingsCompat.setForceDark(this, WebSettingsCompat.FORCE_DARK_AUTO)
-        }
+    // Tüm kaydırma çubuklarını ve taraygıcı kenar efektlerini gizle
+    isHorizontalScrollBarEnabled = false
+    isVerticalScrollBarEnabled = false
+    overScrollMode = View.OVER_SCROLL_NEVER
+    scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
+
+    // Düşük seviyeli geliştirme ayarları
+    isFocusable = true
+    isLongClickable = false // Uzun dokunmayı devre dışı bırak
+
+    // WebView ayarları
+    settings.apply {
+        // En önemli - JavaScript'i etkinleştir - çeşitli optimizasyonlar için gerekli
+        javaScriptEnabled = true
+
+        // Önbellek ve hız ayarları
+        cacheMode = WebSettings.LOAD_NO_CACHE // Önbellekten yükleme yapma, doğrudan network kullan
+        domStorageEnabled = true // Yerel depolama etkinleştir
+        
+        // Kaydırma hızını etkileyen özellikler
+        blockNetworkImage = false // Resimleri yükle
+        loadsImagesAutomatically = true // Resimleri otomatik yükle
+
+        // Yakınlaştırma ayarları - genelde yavaşlamaya neden olur
+        setSupportZoom(false) // Yakınlaştırma özelliği kapalı
+        builtInZoomControls = false // Yakınlaştırma kontrolleri kapalı
+        displayZoomControls = false // Yakınlaştırma düğmeleri kapalı
+        
+        // Görünüm ayarları
+        useWideViewPort = false // Geniş görünüm devre dışı
+        loadWithOverviewMode = false // Genel görünüm modu devre dışı
+        
+        // Tepki hızı için ayarlar
+        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW // Karışık içeriğe izin ver
+        allowContentAccess = true // İçerik erişimi aç
+        setNeedInitialFocus(false) // Başlangıç odaklaması gereksiz
+        
+        // Hız optimizasyonu
+        setGeolocationEnabled(false) // Konum özelliği kapalı
+        javaScriptCanOpenWindowsAutomatically = false // Otomatik açılan pencereleri kapat
+        databaseEnabled = true // Veritabanını etkinleştir
+        
+        // Uyumluluk modu kapat
+        @Suppress("DEPRECATION")
+        setSaveFormData(false) // Form verilerini kaydetmeyi kapat
+        
+        // Çoklu pencere desteğini kapat
+        setSupportMultipleWindows(false) // Gereksiz pencereleri kapat
     }
     
-    // Donanım hızlandırma ayarları - kritik kaydırma performansı için
-    setLayerType(View.LAYER_TYPE_HARDWARE, null)
-    
-    // Kaydırma gecikmesini azaltmak için overscroll ayarları
-    overScrollMode = View.OVER_SCROLL_NEVER
-    
-    // Kaydırma kenar efektlerini devre dışı bırak
-    isVerticalScrollBarEnabled = false
-    isHorizontalScrollBarEnabled = false
+    // WebView'ın donanım tarafından hızlandırılmasını sağla (kritik kaydırma performansı için)
+    @Suppress("DEPRECATION")
+    setDrawingCacheEnabled(false) // Çizim önbelleğini kapat (artık donanım hızlandırma var)
 }
 
 /**
