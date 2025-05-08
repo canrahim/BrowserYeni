@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    
+    <!-- Modern yuvarlak arka plan -->
+    <path android:pathData="M16,0A16,16 0 0,0 0,16A16,16 0 0,0 16,32A16,16 0 0,0 32,16A16,16 0 0,0 16,0z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="2"
+                android:startY="2"
+                android:endX="30"
+                android:endY="30"
+                android:type="linear">
+                <item android:offset="0" android:color="#FF1565C0"/>
+                <item android:offset="1" android:color="#FF2196F3"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    
+    <!-- İç parlak halka -->
+    <path
+        android:pathData="M16,4A12,12 0 0,0 4,16A12,12 0 0,0 16,28A12,12 0 0,0 28,16A12,12 0 0,0 16,4z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.1"/>
+    
+    <!-- Asforce Tarayıcı logo - gezegen/dünya sembolü -->
+    <path
+        android:pathData="M16,8A8,8 0 0,0 8,16A8,8 0 0,0 16,24A8,8 0 0,0 24,16A8,8 0 0,0 16,8z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000"/>
+        
+    <!-- Meridyen/paralel çizgiler -->
+    <path
+        android:pathData="M16,8C15.5,8 12,10 12,16C12,22 15.5,24 16,24M16,8C16.5,8 20,10 20,16C20,22 16.5,24 16,24M8,16L24,16"
+        android:strokeWidth="1.2"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000"/>
+    
+    <!-- Uydular/küçük yörünge parçaları -->
+    <path
+        android:pathData="M16,5A2,2 0 0,0 14,7A2,2 0 0,0 16,9A2,2 0 0,0 18,7A2,2 0 0,0 16,5z"
+        android:fillColor="#90CAF9"/>
+    <path
+        android:pathData="M16,23A2,2 0 0,0 14,25A2,2 0 0,0 16,27A2,2 0 0,0 18,25A2,2 0 0,0 16,23z"
+        android:fillColor="#90CAF9"/>
+    <path
+        android:pathData="M5,16A2,2 0 0,0 3,18A2,2 0 0,0 5,20A2,2 0 0,0 7,18A2,2 0 0,0 5,16z"
+        android:fillColor="#90CAF9"/>
+    <path
+        android:pathData="M27,16A2,2 0 0,0 25,18A2,2 0 0,0 27,20A2,2 0 0,0 29,18A2,2 0 0,0 27,16z"
+        android:fillColor="#90CAF9"/>
+    
+    <!-- Yörünge etkisi -->
+    <path
+        android:pathData="M16,4A12,12 0 0,0 4,16A12,12 0 0,0 16,28A12,12 0 0,0 28,16A12,12 0 0,0 16,4z"
+        android:strokeWidth="0.8"
+        android:strokeColor="#FFFFFF"
+        android:strokeAlpha="0.4"
+        android:fillColor="#00000000"/>
+</vector>

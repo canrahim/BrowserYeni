@@ -85,6 +85,9 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.15.1")
     annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
     
+    // JSoup - HTML parsing için (favicon URL'lerini bulmak için)
+    implementation("org.jsoup:jsoup:1.16.1")
+    
     // Test kütüphaneleri
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
