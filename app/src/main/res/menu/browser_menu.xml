@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_refresh"
+        android:title="Yenile" />
+    <item
+        android:id="@+id/action_forward"
+        android:title="İleri" />
+    <item
+        android:id="@+id/action_new_tab"
+        android:title="Yeni Sekme" />
+    <item
+        android:id="@+id/action_settings"
+        android:title="Ayarlar" />
+</menu>
