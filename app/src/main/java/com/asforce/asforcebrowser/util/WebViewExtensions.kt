@@ -12,19 +12,16 @@ import androidx.webkit.WebViewFeature
 
 /**
  * WebView için yardımcı uzantı fonksiyonları
- * 
+ *
  * WebView'ın yapılandırılması ve özelleştirilmesi için kullanışlı metotlar içerir.
- * Referans: Kotlin Extension Functions
  */
 
 /**
- * WebView'ın temel konfigürasyonunu yapar
- * 
- * WebView için gerekli temel ayarları yükler, özellikle kademeli kaydırmayı engelleyecek şekilde ayarlar.
+ * WebView'ın temel konfigürasyonunu yapar ve performans optimizasyonlarını uygular
  */
 @SuppressLint("SetJavaScriptEnabled")
 fun WebView.configure() {
-    // Kritik - donanım hızlandırma katmanını ayarla (kaydırma için önemli)
+    // Donanım hızlandırma katmanını ayarla (kaydırma için önemli)
     setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
     // Tüm kaydırma çubuklarını ve taraygıcı kenar efektlerini gizle
@@ -33,19 +30,19 @@ fun WebView.configure() {
     overScrollMode = View.OVER_SCROLL_NEVER
     scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
 
-    // Düşük seviyeli geliştirme ayarları
+    // Dokunma tepki ayarları
     isFocusable = true
     isLongClickable = false // Uzun dokunmayı devre dışı bırak
 
     // WebView ayarları
     settings.apply {
-        // En önemli - JavaScript'i etkinleştir - çeşitli optimizasyonlar için gerekli
+        // JavaScript - üretim modunda güvenli şekilde etkinleştir
         javaScriptEnabled = true
 
         // Önbellek ve hız ayarları
-        cacheMode = WebSettings.LOAD_NO_CACHE // Önbellekten yükleme yapma, doğrudan network kullan
+        cacheMode = WebSettings.LOAD_DEFAULT // Üretimde normal önbelleği kullan
         domStorageEnabled = true // Yerel depolama etkinleştir
-        
+
         // Kaydırma hızını etkileyen özellikler
         blockNetworkImage = false // Resimleri yükle
         loadsImagesAutomatically = true // Resimleri otomatik yükle
@@ -54,32 +51,51 @@ fun WebView.configure() {
         setSupportZoom(false) // Yakınlaştırma özelliği kapalı
         builtInZoomControls = false // Yakınlaştırma kontrolleri kapalı
         displayZoomControls = false // Yakınlaştırma düğmeleri kapalı
-        
+
         // Görünüm ayarları
         useWideViewPort = false // Geniş görünüm devre dışı
         loadWithOverviewMode = false // Genel görünüm modu devre dışı
-        
+
         // Tepki hızı için ayarlar
-        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW // Karışık içeriğe izin ver
+        mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE // Üretimde güvenli karışık içerik modu
         allowContentAccess = true // İçerik erişimi aç
         setNeedInitialFocus(false) // Başlangıç odaklaması gereksiz
-        
+
         // Hız optimizasyonu
         setGeolocationEnabled(false) // Konum özelliği kapalı
         javaScriptCanOpenWindowsAutomatically = false // Otomatik açılan pencereleri kapat
         databaseEnabled = true // Veritabanını etkinleştir
-        
+
         // Uyumluluk modu kapat
         @Suppress("DEPRECATION")
         setSaveFormData(false) // Form verilerini kaydetmeyi kapat
-        
+
         // Çoklu pencere desteğini kapat
         setSupportMultipleWindows(false) // Gereksiz pencereleri kapat
+
+        // Üretim için güvenli HTTP/HTTPS güvenliği
+        @Suppress("DEPRECATION")
+        savePassword = false // Parola kaydetmeyi engelle
+
+        // Üretim için performans optimizasyonu
+        setRenderPriority(WebSettings.RenderPriority.HIGH)
     }
-    
-    // WebView'ın donanım tarafından hızlandırılmasını sağla (kritik kaydırma performansı için)
+
+    // HTML5 medya API'leri için gerekli ise
+    setNetworkAvailable(true)
+
+    // Sayfa içi kaydırma hızını arttır
     @Suppress("DEPRECATION")
     setDrawingCacheEnabled(false) // Çizim önbelleğini kapat (artık donanım hızlandırma var)
+
+    // Karanlık mod desteği ekle (mümkünse)
+    try {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+            WebSettingsCompat.setForceDark(settings, WebSettingsCompat.FORCE_DARK_AUTO)
+        }
+    } catch (e: Exception) {
+        // Desteklenmeyen cihazlar için sessizce devam et
+    }
 }
 
 /**

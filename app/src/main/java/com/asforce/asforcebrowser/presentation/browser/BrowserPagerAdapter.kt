@@ -8,83 +8,60 @@ import com.asforce.asforcebrowser.util.viewpager.FragmentCache
 
 /**
  * BrowserPagerAdapter - Sekmeler arası geçiş için ViewPager2 adapter'ı
- * 
+ *
  * Her sekme için FragmentCache üzerinden bir WebViewFragment yönetir.
- * Referans: ViewPager2 ile Fragment yönetimi
  */
 class BrowserPagerAdapter(
     fragmentActivity: FragmentActivity,
     private val tabs: MutableList<Tab> = mutableListOf()
 ) : FragmentStateAdapter(fragmentActivity) {
-    
-    // İzleme için log tag'i
-    private val TAG = "BrowserPagerAdapter"
 
     // Adapter yeniden oluştuğunda fragmentların yeniden oluşmasını önlemek için bir anahtar kullanıyoruz
     private val uniqueId = System.currentTimeMillis()
 
     override fun getItemId(position: Int): Long {
-        val id = if (position < tabs.size) tabs[position].id else position.toLong()
-        android.util.Log.d(TAG, "getItemId: Pozisyon=$position, ID=$id")
-        return id
+        return if (position < tabs.size) tabs[position].id else position.toLong()
     }
-    
+
     override fun containsItem(itemId: Long): Boolean {
         // Fragment önbellekte varsa her zaman true döndür
         val containsInCache = FragmentCache.getFragment(itemId) != null
-        
+
         // Tabs listesinde var mı kontrol et
         val containsInTabs = tabs.any { it.id == itemId }
-        
-        // Sonucu logla ve döndür
-        val result = containsInCache || containsInTabs
-        android.util.Log.d(TAG, "containsItem: ID=$itemId, Önbellekte=$containsInCache, Sekmede=$containsInTabs, Sonuç=$result")
-        return result
+
+        // Sonucu döndür
+        return containsInCache || containsInTabs
     }
 
-    override fun getItemCount(): Int {
-        val count = tabs.size
-        android.util.Log.d(TAG, "getItemCount: Count=$count")
-        return count
-    }
+    override fun getItemCount(): Int = tabs.size
 
     override fun createFragment(position: Int): Fragment {
         val tab = if (position < tabs.size) tabs[position] else return Fragment()
 
-        android.util.Log.d(TAG, "createFragment: Pozisyon=$position için fragment istendi TabID=${tab.id}")
-        
         // FragmentCache'den mevcut fragment'ı al veya yeni oluştur
-        val fragment = FragmentCache.getOrCreateFragment(tab.id, tab.url)
-        
-        android.util.Log.d(TAG, "createFragment: Fragment oluşturuldu/döndürüldü: Pozisyon=$position, TabID=${tab.id}")
-        return fragment
+        return FragmentCache.getOrCreateFragment(tab.id, tab.url)
     }
 
     /**
      * Sekme listesini günceller
      */
     fun updateTabs(newTabs: List<Tab>) {
-        // Değişimleri izlemek için
-        android.util.Log.d(TAG, "updateTabs: Önceki boyut=${tabs.size}, Yeni boyut=${newTabs.size}")
-        
         // Sekme ID'lerini değişimden önce ve sonra kaydet
         val oldTabIds = tabs.map { it.id }
         val newTabIds = newTabs.map { it.id }
-        
+
         // Silinen sekmeleri tespit et
         val removedTabIds = oldTabIds.filterNot { it in newTabIds }
-        
+
         // Silinen sekmelerin fragment kayıtlarını temizle
         removedTabIds.forEach { tabId ->
             FragmentCache.removeFragment(tabId)
-            android.util.Log.d(TAG, "updateTabs: Fragment silindi: TabID=$tabId")
         }
-        
+
         tabs.clear()
         tabs.addAll(newTabs)
-        
-        android.util.Log.d(TAG, "updateTabs: Eski ID'ler=$oldTabIds, Yeni ID'ler=$newTabIds, Silinenler=$removedTabIds")
-        
+
         // Sadece gerekli öğelerin güncellenmesini sağla - tüm listeyi yenileme
         if (removedTabIds.isNotEmpty() || oldTabIds.size != newTabIds.size) {
             notifyDataSetChanged()
@@ -95,9 +72,7 @@ class BrowserPagerAdapter(
      * ID'ye göre fragment'ı döndürür
      */
     fun getFragmentByTabId(tabId: Long): WebViewFragment? {
-        val fragment = FragmentCache.getFragment(tabId)
-        android.util.Log.d(TAG, "getFragmentByTabId: ID=$tabId, Fragment ${if (fragment != null) "bulundu" else "bulunamadı"}")
-        return fragment
+        return FragmentCache.getFragment(tabId)
     }
 
     /**
@@ -111,8 +86,6 @@ class BrowserPagerAdapter(
      * Sekme ID'sine göre pozisyon döndürür
      */
     fun getPositionForTabId(tabId: Long): Int {
-        val position = tabs.indexOfFirst { it.id == tabId }
-        android.util.Log.d(TAG, "getPositionForTabId: ID=$tabId, Pozisyon=$position")
-        return position
+        return tabs.indexOfFirst { it.id == tabId }
     }
 }

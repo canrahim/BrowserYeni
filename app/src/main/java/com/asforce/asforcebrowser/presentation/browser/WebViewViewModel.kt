@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.asforce.asforcebrowser.data.model.Tab
 import com.asforce.asforcebrowser.domain.repository.TabHistoryRepository
 import com.asforce.asforcebrowser.domain.repository.TabRepository
 import com.asforce.asforcebrowser.util.FaviconManager
@@ -17,9 +16,8 @@ import javax.inject.Inject
 
 /**
  * WebViewViewModel - WebViewFragment için ViewModel
- * 
+ *
  * WebView ile ilgili durumları ve verileri yönetir.
- * Referans: Android ViewModel ve MVVM mimarisi
  */
 @HiltViewModel
 class WebViewViewModel @Inject constructor(
@@ -43,43 +41,38 @@ class WebViewViewModel @Inject constructor(
      */
     suspend fun updateTab(tabId: Long, url: String, title: String, favicon: Bitmap?) {
         // Sekme verilerini güncelle
-        val tab = tabRepository.getTabById(tabId)
-        tab?.let {
-            var faviconPath: String? = null
-            
-            // Favicon varsa kaydet ve yolunu al
-            if (favicon != null) {
+        val tab = tabRepository.getTabById(tabId) ?: return
+
+        // Favicon olmadan hızlıca güncelle
+        val updatedTab = tab.copy(
+            title = title,
+            url = url
+        )
+        tabRepository.updateTab(updatedTab)
+
+        // Geçmiş kaydını ekle
+        tabHistoryRepository.addHistory(tabId, url, title)
+
+        // Eğer favicon varsa, ayrı bir işlem olarak işle
+        if (favicon != null) {
+            viewModelScope.launch {
                 try {
                     // Favicon'u kaydet ve yolunu al
-                    android.util.Log.d("WebViewViewModel", "Favicon için kaydediliyor: TabID=$tabId, URL=$url")
-                    faviconPath = FaviconManager.downloadAndSaveFavicon(context, url, tabId)
-                    
+                    val faviconPath = FaviconManager.downloadAndSaveFavicon(context, url, tabId)
+
                     // Eğer favicon yolu alındıysa Tab nesnesini tekrar güncelle
                     if (faviconPath != null) {
-                        android.util.Log.d("WebViewViewModel", "Favicon kaydedildi: TabID=$tabId, Path=$faviconPath")
                         val updatedTabWithFavicon = tab.copy(
                             title = title,
                             url = url,
                             faviconUrl = faviconPath
                         )
                         tabRepository.updateTab(updatedTabWithFavicon)
-                    } else {
-                        android.util.Log.e("WebViewViewModel", "Favicon kaydedilemedi: TabID=$tabId")
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("WebViewViewModel", "Favicon güncelleme hatası: ${e.message}")
+                    // Production için sessiz catch - hataları gizle
                 }
             }
-            
-            // Önce favicon olmadan güncelle (hızlı görüntüleme için)
-            val updatedTab = it.copy(
-                title = title,
-                url = url
-            )
-            tabRepository.updateTab(updatedTab)
-            
-            // Geçmiş kaydını ekle
-            tabHistoryRepository.addHistory(tabId, url, title)
         }
     }
 }

@@ -4,40 +4,32 @@ import android.app.Application
 import android.webkit.WebView
 import android.os.Build
 import android.view.ViewGroup
-import android.util.Log
 import com.asforce.asforcebrowser.util.performance.PerformanceOptimizer
 import dagger.hilt.android.HiltAndroidApp
 
 /**
  * AsforceBrowserApp - Uygulama sınıfı
- * 
+ *
  * Hilt Dependency Injection'ı başlatmak ve uygulama genelinde
  * performans optimizasyonlarını ayarlamak için kullanılır.
- * 
- * Referans: 
- * - Hilt Application Sınıfı
- * - Android WebView Performans Optimizasyonu
  */
 @HiltAndroidApp
 class AsforceBrowserApp : Application() {
 
-    companion object {
-        private const val TAG = "AsforceBrowserApp"
-    }
-    
+    // Üretim ortamı için bu değişkeni false yapın
+    private val isDebugMode = false
+
     override fun onCreate() {
         super.onCreate()
-        
+
         // Uygulama başlangıcında optimizasyonları yap
         initializeOptimizations()
     }
-    
+
     /**
      * Uygulama çapında performans optimizasyonlarını başlatır
      */
     private fun initializeOptimizations() {
-        Log.d(TAG, "Uygulama optimizasyonları başlatılıyor")
-        
         // WebView optimizasyonları için ön hazırlık
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val processName = Application.getProcessName()
@@ -46,18 +38,16 @@ class AsforceBrowserApp : Application() {
                 WebView.setDataDirectorySuffix(processName)
             }
         }
-        
-        // Debug için Chrome DevTools entegrasyonunu etkinleştir
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true)
+
+        // Sadece debug modunda Chrome DevTools entegrasyonunu etkinleştir
+        if (isDebugMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(isDebugMode)
         }
-        
+
         // Önbellek ve bellek yönetimi optimize et
         optimizeMemoryUsage()
-        
-        Log.d(TAG, "Uygulama optimizasyonları tamamlandı")
     }
-    
+
     /**
      * Bellek kullanımı ve önbellek optimizasyonlarını yapar
      */
@@ -69,13 +59,13 @@ class AsforceBrowserApp : Application() {
                 destroy() // kaynakları serbest bırak
             }
         } catch (e: Exception) {
-            Log.e(TAG, "WebView önbellek temizleme hatası: ${e.message}")
+            // Hata durumunda sessizce devam et
         }
-        
+
         // Düşük bellek durumlarında önbelleği temizle
         registerComponentCallbacks(LowMemoryHandler(this))
     }
-    
+
     /**
      * Mevcut bir WebView'ı optimize etmek için yardımcı metod
      */
@@ -84,7 +74,7 @@ class AsforceBrowserApp : Application() {
         val optimizer = PerformanceOptimizer.getInstance(applicationContext)
         optimizer.optimizeWebView(webView)
     }
-    
+
     /**
      * Düşük bellek durumları için ComponentCallbacks2 implementasyonu
      */
@@ -95,16 +85,16 @@ class AsforceBrowserApp : Application() {
                 clearWebViewCache(app)
             }
         }
-        
+
         override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
             // Konfigürasyon değişikliklerinde bir şey yapma
         }
-        
+
         override fun onLowMemory() {
             // Düşük bellek durumunda WebView önbelleğini temizle
             clearWebViewCache(app)
         }
-        
+
         private fun clearWebViewCache(context: android.content.Context) {
             try {
                 // Gizli bir WebView kullanarak önbelleği temizle
@@ -116,7 +106,7 @@ class AsforceBrowserApp : Application() {
                     destroy()
                 }
             } catch (e: Exception) {
-                Log.e("LowMemoryHandler", "WebView temizleme hatası: ${e.message}")
+                // Hata durumunda sessizce devam et
             }
         }
     }

@@ -1,120 +1,197 @@
 package com.asforce.asforcebrowser.util.performance
 
 import android.content.Context
-import android.view.View
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.webkit.WebSettings
-import android.webkit.CookieManager
+import android.graphics.Bitmap
 import android.os.Build
+import android.util.Log
+import android.view.View
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
-import android.graphics.Bitmap
-import android.util.Log
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 
 /**
- * ScrollOptimizer - WebView kaydırma performansı optimizasyonu
- * 
- * Bu sınıf, WebView için kaydırma performansını optimize eden ve 
- * animasyonlu kaydırma davranışlarını düzenleyen yardımcı metotlar içerir.
- * 
- * Referans: 
- * - Android WebView Performans Optimizasyonu (Google Developers)
- * - Modern JavaScript DOM Manipülasyonu Teknikleri
+ * ScrollOptimizer - WebView scrolling performance optimization
+ *
+ * This class contains helper methods that optimize scrolling performance
+ * for WebView and adjust animated scrolling behaviors.
+ *
+ * References:
+ * - Android WebView Performance Optimization (Google Developers)
+ * - Modern JavaScript DOM Manipulation Techniques
  */
 class ScrollOptimizer(private val context: Context) {
-    
+
     companion object {
         private const val TAG = "ScrollOptimizer"
-        private const val MINIMAL_JS = true // Minimal JavaScript kullan
+
+        // Scrolling optimization mode
+        private enum class ScriptMode {
+            MINIMAL, // Minimal performance-focused optimizations
+            COMPREHENSIVE // Full optimization suite
+        }
+
+        // Default configuration
+        private val DEFAULT_SCRIPT_MODE = ScriptMode.MINIMAL
     }
-    
+
     /**
-     * WebView için optimize edilmiş donanım ve render ayarlarını yapar
+     * Configures optimized hardware and render settings for WebView
      */
     fun optimizeWebViewHardwareRendering(webView: WebView) {
-        // Donanım hızlandırma ayarları
+        // Hardware acceleration settings
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        
-        // Render performansını artıran ayarlar
+
+        // Settings that increase render performance
         webView.settings.apply {
-            // Kritik render ayarları
-            setRenderPriority(WebSettings.RenderPriority.HIGH) 
-            
-            // Önbellek ayarları - ağ erişimini optimize eder
-            cacheMode = WebSettings.LOAD_DEFAULT // Önbellek kullanımını etkinleştir
-            
-            // JavaScript ve render optimizasyonu
+            // Critical render settings
+            setRenderPriority(WebSettings.RenderPriority.HIGH)
+
+            // Cache settings - optimizes network access
+            cacheMode = WebSettings.LOAD_DEFAULT
+
+            // JavaScript and render optimization
             javaScriptEnabled = true
-            domStorageEnabled = true // DOM Depolama etkin
+            domStorageEnabled = true
             databaseEnabled = true
-            
-            // HTML5 Depolama için
+
+            // HTML5 Storage
             databaseEnabled = true
             domStorageEnabled = true
-            
-            // Render performans ayarları
+
+            // Render performance settings
             blockNetworkImage = false
             loadsImagesAutomatically = true
-            
-            // Günümüz standartlarına uygun
+
+            // Compliant with modern standards
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            
-            // Kaydırma sırasında performans için gerekli ayarlar
+
+            // Settings necessary for performance during scrolling
             useWideViewPort = true
             loadWithOverviewMode = true
-            
-            // Görüntü yükleme optimizasyonu
-            blockNetworkImage = false
-            loadsImagesAutomatically = true
         }
-        
-        // WebView optimize edilmiş çizim ayarları
+
+        // WebView optimized drawing settings
         webView.apply {
             isScrollbarFadingEnabled = true
-            scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY // Kaydırma çubuğunu içerik alanının dışına yerleştir
-            isVerticalScrollBarEnabled = false // Kaydırma çubuklarını gizle
+            scrollBarStyle = View.SCROLLBARS_OUTSIDE_OVERLAY
+            isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
-            overScrollMode = View.OVER_SCROLL_NEVER // Kaydırma sınırı efektini kaldır
+            overScrollMode = View.OVER_SCROLL_NEVER
         }
-        
-        // Çerez yöneticisini optimize et (RAM kullanımını azaltır)
+
+        // Optimize cookie manager (reduces RAM usage)
+        optimizeCookieManager(webView)
+    }
+
+    /**
+     * Optimizes cookie manager settings for better performance
+     */
+    private fun optimizeCookieManager(webView: WebView) {
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        cookieManager.setAcceptThirdPartyCookies(webView, true)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(webView, true)
+        }
     }
-    
+
     /**
-     * Kaydırma optimizasyonu için JavaScript kodunu enjekte eder
-     * En minimal ve verimli kodu kullanır
+     * Injects JavaScript code for scrolling optimization
+     * Uses the most minimal and efficient code
      */
     fun injectOptimizedScrollingScript(webView: WebView) {
-        // JavaScript Bridge oluşturma - Native WebView ile JavaScript arasında köprü
+        // Create JavaScript Bridge - bridge between Native WebView and JavaScript
         class JSInterface {
             @JavascriptInterface
             fun reportScrollPerformance(message: String) {
-                Log.d(TAG, "Scroll Performansı: $message")
+                Log.d(TAG, "Scroll Performance: $message")
             }
         }
-        
-        // JavaScript arayüzünü ekle
+
+        // Add JavaScript interface
         webView.addJavascriptInterface(JSInterface(), "ScrollOptimizer")
-        
-        // Sayfada kaydırma performansını artıran JavaScripti çalıştır
-        // Minimal veya kapsamlı seçeneği kullan
-        val script = if (MINIMAL_JS) {
-            // Minimal script - performans için
-            """
+
+        // Run JavaScript that improves scrolling performance on the page
+        // Use minimal or comprehensive option
+        val scriptMode = DEFAULT_SCRIPT_MODE
+        val script = when (scriptMode) {
+            ScriptMode.MINIMAL -> JsScripts.MINIMAL_OPTIMIZATION
+            ScriptMode.COMPREHENSIVE -> JsScripts.COMPREHENSIVE_OPTIMIZATION
+        }
+
+        // Inject script into page
+        webView.evaluateJavascript(script, null)
+    }
+
+    /**
+     * Creates a WebViewClient with enhanced render performance
+     */
+    fun createOptimizedWebViewClient(): WebViewClient {
+        return object : WebViewClient() {
+            override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                // Optimizations to apply when page starts loading
+                optimizeWebViewHardwareRendering(view)
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                // Apply scrolling optimization when page is fully loaded
+                injectOptimizedScrollingScript(view)
+            }
+
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                Log.e(TAG, "Render process crashed: ${detail.didCrash()}")
+                // Recovery strategy when render process crashes
+                if (detail.didCrash()) {
+                    // Refresh the webview in case of crashing
+                    view.reload()
+                    return true
+                }
+                return false
+            }
+        }
+    }
+
+    /**
+     * Helper method that applies all optimizations to WebView at once
+     */
+    fun applyAllOptimizations(webView: WebView) {
+        // Apply hardware acceleration optimization
+        optimizeWebViewHardwareRendering(webView)
+
+        // Assign optimized WebViewClient
+        webView.webViewClient = createOptimizedWebViewClient()
+
+        // Run JavaScript (if page is already loaded)
+        if (webView.url != null) {
+            injectOptimizedScrollingScript(webView)
+        }
+
+        Log.d(TAG, "All WebView optimizations applied")
+    }
+
+    /**
+     * Collection of JavaScript snippets used for scrolling optimization
+     */
+    private object JsScripts {
+        /**
+         * Minimal optimization script - focused on performance
+         */
+        const val MINIMAL_OPTIMIZATION = """
             (function() {
-                // Kaydırma davranışını düzelt
+                // Fix scrolling behavior
                 document.documentElement.style.setProperty('scroll-behavior', 'auto', 'important');
                 
-                // Genel stil enjeksiyonu
+                // General style injection
                 var style = document.createElement('style');
                 style.textContent = '* { scroll-behavior: auto !important; scroll-snap-type: none !important; }';
                 document.head.appendChild(style);
                 
-                // Scrollable elementleri izle
+                // Monitor scrollable elements
                 function optimizeScrollables() {
                     var elements = document.querySelectorAll('[class*="scroll"],[class*="carousel"],[class*="slider"]');
                     for(var i = 0; i < elements.length; i++) {
@@ -125,17 +202,17 @@ class ScrollOptimizer(private val context: Context) {
                     }
                 }
                 
-                // İlk çalıştırma
+                // First run
                 optimizeScrollables();
                 
-                // DOM değişikliklerini izle
+                // Monitor DOM changes
                 if (window.MutationObserver) {
                     new MutationObserver(optimizeScrollables).observe(
                         document.documentElement, { childList: true, subtree: true }
                     );
                 }
                 
-                // Scroll API düzeltmeleri
+                // Scroll API fixes
                 if (window.scrollTo) {
                     var originalScrollTo = window.scrollTo;
                     window.scrollTo = function() {
@@ -146,19 +223,21 @@ class ScrollOptimizer(private val context: Context) {
                     };
                 }
                 
-                // Rapor ver
+                // Report back
                 if (window.ScrollOptimizer) {
-                    ScrollOptimizer.reportScrollPerformance("Optimizasyon uygulandı");
+                    ScrollOptimizer.reportScrollPerformance("Optimization applied");
                 }
                 
-                console.log('AsforceBrowser: Optimize kaydırma etkinleştirildi');
+                console.log('AsforceBrowser: Optimized scrolling enabled');
             })();
-            """
-        } else {
-            // Daha kapsamlı script - tam müdahale
-            """
+        """
+
+        /**
+         * Comprehensive optimization script - complete intervention
+         */
+        const val COMPREHENSIVE_OPTIMIZATION = """
             (function() {
-                // Stil enjeksiyonu için ana fonksiyon
+                // Main function for style injection
                 function injectStyles() {
                     var style = document.createElement('style');
                     style.textContent = `
@@ -172,20 +251,20 @@ class ScrollOptimizer(private val context: Context) {
                             overscroll-behavior: none !important;
                         }
                         
-                        /* Kaydırma çubuklarını gizle */
+                        /* Hide scrollbars */
                         ::-webkit-scrollbar {
                             width: 0 !important; 
                             height: 0 !important;
                             background: transparent !important;
                         }
                         
-                        /* Kaydırma çubuğu stilleri */
+                        /* Scrollbar styles */
                         * {
                             -ms-overflow-style: none !important;
                             scrollbar-width: none !important;
                         }
                         
-                        /* Yaygın bileşenlere müdahale */
+                        /* Intervene in common components */
                         .scrollable, [class*="scroll"], [id*="scroll"], 
                         [class*="slider"], [id*="slider"], 
                         [class*="carousel"], [id*="carousel"] {
@@ -196,9 +275,9 @@ class ScrollOptimizer(private val context: Context) {
                     document.head.appendChild(style);
                 }
                 
-                // Smooth Scroll API'yi devre dışı bırak
+                // Disable Smooth Scroll API
                 function overrideScrollAPIs() {
-                    // scrollTo API düzeltme
+                    // scrollTo API fix
                     if (window.scrollTo) {
                         var originalScrollTo = window.scrollTo;
                         window.scrollTo = function() {
@@ -212,7 +291,7 @@ class ScrollOptimizer(private val context: Context) {
                         };
                     }
                     
-                    // scrollBy API düzeltme
+                    // scrollBy API fix
                     if (window.scrollBy) {
                         var originalScrollBy = window.scrollBy;
                         window.scrollBy = function() {
@@ -226,7 +305,7 @@ class ScrollOptimizer(private val context: Context) {
                         };
                     }
                     
-                    // scrollIntoView API düzeltme
+                    // scrollIntoView API fix
                     if (Element.prototype.scrollIntoView) {
                         var originalScrollIntoView = Element.prototype.scrollIntoView;
                         Element.prototype.scrollIntoView = function() {
@@ -243,9 +322,9 @@ class ScrollOptimizer(private val context: Context) {
                     }
                 }
                 
-                // Scroll stilleri içeren elementleri optimize et
+                // Optimize elements with scroll styles
                 function optimizeScrollableElements() {
-                    // Tüm kaydırılabilir elementleri bul
+                    // Find all scrollable elements
                     var scrollers = document.querySelectorAll('[class*="scroller"], [class*="scroll"], [class*="slider"], [id*="carousel"]');
                     for (var i = 0; i < scrollers.length; i++) {
                         if (scrollers[i].style) {
@@ -254,7 +333,7 @@ class ScrollOptimizer(private val context: Context) {
                         }
                     }
                     
-                    // Animasyonlu elementleri durdur
+                    // Stop animated elements
                     var animatedElements = document.querySelectorAll('[style*="animation"], [style*="transition"]');
                     for (var i = 0; i < animatedElements.length; i++) {
                         if (animatedElements[i].style) {
@@ -264,7 +343,7 @@ class ScrollOptimizer(private val context: Context) {
                     }
                 }
                 
-                // DOM değişikliklerini izle
+                // Monitor DOM changes
                 function setupMutationObserver() {
                     if (window.MutationObserver) {
                         var observer = new MutationObserver(function() {
@@ -280,71 +359,19 @@ class ScrollOptimizer(private val context: Context) {
                     }
                 }
                 
-                // Ana terapilerini uygula
+                // Apply main therapies
                 injectStyles();
                 overrideScrollAPIs();
                 optimizeScrollableElements();
                 setupMutationObserver();
                 
-                // Natif uygulamaya performans verisi gönder
+                // Send performance data to native app
                 if (window.ScrollOptimizer) {
-                    ScrollOptimizer.reportScrollPerformance("Kapsamlı optimizasyon uygulandı");
+                    ScrollOptimizer.reportScrollPerformance("Comprehensive optimization applied");
                 }
                 
-                console.log('AsforceBrowser: Gelişmiş kaydırma optimizasyonu etkinleştirildi');
+                console.log('AsforceBrowser: Advanced scrolling optimization enabled');
             })();
-            """
-        }
-        
-        // Sayfaya script enjekte et
-        webView.evaluateJavascript(script, null)
-    }
-    
-    /**
-     * Render performansını artırmak için gelişmiş WebViewClient
-     */
-    fun createOptimizedWebViewClient(): WebViewClient {
-        return object : WebViewClient() {
-            override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
-                // Sayfa yüklenmeye başladığında uygulanacak optimizasyonlar
-                optimizeWebViewHardwareRendering(view)
-            }
-            
-            override fun onPageFinished(view: WebView, url: String) {
-                super.onPageFinished(view, url)
-                // Sayfa tamamen yüklendiğinde kaydırma optimizasyonu yap
-                injectOptimizedScrollingScript(view)
-            }
-            
-            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-                Log.e(TAG, "Render process crashed: ${detail.didCrash()}")
-                // Render işlemi çöktüğünde kurtarma stratejisi
-                if (detail.didCrash()) {
-                    // Crashing durumunda webview'i yenile
-                    view.reload()
-                    return true
-                }
-                return false
-            }
-        }
-    }
-    
-    /**
-     * WebView için tüm optimizasyonları tek seferde uygulayan yardımcı metod
-     */
-    fun applyAllOptimizations(webView: WebView) {
-        // Donanım hızlandırma optimizasyonunu uygula
-        optimizeWebViewHardwareRendering(webView)
-        
-        // Optimize edilmiş WebViewClient ata
-        webView.webViewClient = createOptimizedWebViewClient()
-        
-        // JavaScript'i çalıştır (eğer sayfa zaten yüklenmişse)
-        if (webView.url != null) {
-            injectOptimizedScrollingScript(webView)
-        }
-        
-        Log.d(TAG, "Tüm WebView optimizasyonları uygulandı")
+        """
     }
 }
