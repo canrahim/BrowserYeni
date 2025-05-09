@@ -64,30 +64,82 @@ class TabAdapter(
                 // Sekme başlığını ayarla
                 tabTitle.text = tab.title.ifEmpty { "Yeni Sekme" }
                 
-                // Favicon'u yükle
-                if (tab.faviconUrl != null) {
-                    // Favicon dosyasını yükle
+                android.util.Log.d("TabAdapter", "Sekme için favori ikonu yükleniyor: TabID=${tab.id}, FaviconURL=${tab.faviconUrl}")
+                
+            // Favicon'u yükle
+            if (tab.faviconUrl != null && tab.faviconUrl!!.isNotEmpty()) {
+                try {
+                    // Favicon dosyasının tam yolu
                     val faviconFile = File(root.context.filesDir, tab.faviconUrl)
-                    if (faviconFile.exists()) {
-                        // Glide ile favicon'u yükle
-                        Glide.with(root.context)
-                            .load(faviconFile)
-                            .placeholder(R.drawable.ic_globe) // Varsayılan ikon
-                            .error(R.drawable.ic_globe) // Hata durumunda gösterilecek ikon
-                            .into(favicon)
+                    
+                    if (faviconFile.exists() && faviconFile.length() > 0) {
+                        android.util.Log.d("TabAdapter", "Favicon dosyası mevcut: ${faviconFile.absolutePath}, boyut=${faviconFile.length()}")
                         
-                        // Renk filtresini kaldır (favicon'un orijinal renklerini görüntülemek için)
-                        favicon.clearColorFilter()
+                        // Glide ayarlarını optimize edelim
+                        Glide.with(root.context.applicationContext) // ApplicationContext kullan - memory leak önlemek için
+                            .load(faviconFile)
+                            .skipMemoryCache(false)
+                            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
+                            .centerCrop()
+                            .override(32, 32)
+                            .placeholder(R.drawable.ic_globe)
+                            .error(R.drawable.ic_globe)
+                            .into(object : com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
+                                override fun onResourceReady(
+                                    resource: android.graphics.drawable.Drawable,
+                                    transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?
+                                ) {
+                                    // Kaynak hazır olduğunda görseli ayarla ve filtre temizle
+                                    favicon.setImageDrawable(resource)
+                                    favicon.clearColorFilter() // Filtre temizleme
+                                    android.util.Log.d("TabAdapter", "Favicon başarıyla uygulandı: TabID=${tab.id}")
+                                }
+                                
+                                override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
+                                    // Yükleme iptal edildiğinde varsayılan simgeyi göster
+                                    favicon.setImageResource(R.drawable.ic_globe)
+                                    setIconColorFilter(isActive)
+                                }
+                                
+                                override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
+                                    // Yükleme başarısız olduğunda varsayılan simgeyi göster
+                                    favicon.setImageResource(R.drawable.ic_globe)
+                                    setIconColorFilter(isActive)
+                                    android.util.Log.e("TabAdapter", "Favicon yükleme başarısız: TabID=${tab.id}")
+                                    
+                                    // Google'un favicon servisini dene
+                                    tryLoadFromGoogle(tab, isActive)
+                                }
+                            })
                     } else {
+                        android.util.Log.d("TabAdapter", "Favicon dosyası bulunamadı veya boş: ${faviconFile.absolutePath}")
                         // Dosya yoksa varsayılan simgeyi göster
                         favicon.setImageResource(R.drawable.ic_globe)
                         setIconColorFilter(isActive)
+                        
+                        // Google'un favicon servisini dene
+                        tryLoadFromGoogle(tab, isActive)
                     }
-                } else {
-                    // Favicon yoksa varsayılan simgeyi göster
+                } catch (e: Exception) {
+                    android.util.Log.e("TabAdapter", "Favicon yükleme hatası: ${e.message}")
+                    // Hata durumunda varsayılan simgeyi göster
                     favicon.setImageResource(R.drawable.ic_globe)
                     setIconColorFilter(isActive)
+                    
+                    // Google'un favicon servisini dene
+                    tryLoadFromGoogle(tab, isActive)
                 }
+            } else {
+                android.util.Log.d("TabAdapter", "Sekmenin favicon URL'i yok: TabID=${tab.id}")
+                // Favicon yoksa varsayılan simgeyi göster
+                favicon.setImageResource(R.drawable.ic_globe)
+                setIconColorFilter(isActive)
+                
+                // URL mevcut ise Google'un favicon servisini dene
+                if (tab.url.isNotEmpty()) {
+                    tryLoadFromGoogle(tab, isActive)
+                }
+            }
                 
                 // Aktif sekme durumunu ayarla
                 root.isSelected = isActive
@@ -112,11 +164,72 @@ class TabAdapter(
             }
         }
         
+        /**
+         * Favicon için renk filtresini ayarlar
+         */
         private fun setIconColorFilter(isActive: Boolean) {
             if (isActive) {
                 binding.favicon.setColorFilter(binding.root.context.getColor(R.color.iconTintActive))
             } else {
                 binding.favicon.setColorFilter(binding.root.context.getColor(R.color.iconTint))
+            }
+        }
+        
+        /**
+         * Google'un favicon servisinden favicon yüklemeyi dener
+         */
+        private fun tryLoadFromGoogle(tab: Tab, isActive: Boolean) {
+            if (tab.url.isNotEmpty()) {
+                // Web sitesinin ana alan adını çıkar
+                val domain = try {
+                    val uri = android.net.Uri.parse(tab.url)
+                    uri.host ?: ""
+                } catch (e: Exception) {
+                    ""
+                }
+                
+                if (domain.isNotEmpty()) {
+                    // Google'un favicon servisini kullan
+                    val faviconUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=64"
+                    
+                    // Favicon'u Glide ile indir
+                    try {
+                        Glide.with(binding.root.context.applicationContext)
+                            .load(faviconUrl)
+                            .skipMemoryCache(false)
+                            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                            .placeholder(R.drawable.ic_globe)
+                            .error(R.drawable.ic_globe)
+                            .override(32, 32)
+                            .into(object : com.bumptech.glide.request.target.CustomTarget<android.graphics.drawable.Drawable>() {
+                                override fun onResourceReady(
+                                    resource: android.graphics.drawable.Drawable,
+                                    transition: com.bumptech.glide.request.transition.Transition<in android.graphics.drawable.Drawable>?
+                                ) {
+                                    binding.favicon.setImageDrawable(resource)
+                                    binding.favicon.clearColorFilter()
+                                    android.util.Log.d("TabAdapter", "Google Favicon başarıyla yüklendi: TabID=${tab.id}, Domain=$domain")
+                                }
+                                
+                                override fun onLoadCleared(placeholder: android.graphics.drawable.Drawable?) {
+                                    binding.favicon.setImageResource(R.drawable.ic_globe)
+                                    setIconColorFilter(isActive)
+                                }
+                                
+                                override fun onLoadFailed(errorDrawable: android.graphics.drawable.Drawable?) {
+                                    binding.favicon.setImageResource(R.drawable.ic_globe)
+                                    setIconColorFilter(isActive)
+                                    android.util.Log.e("TabAdapter", "Google Favicon yükleme başarısız: TabID=${tab.id}, Domain=$domain")
+                                }
+                            })
+                    } catch (e: Exception) {
+                        android.util.Log.e("TabAdapter", "Google Favicon yükleme hatası: ${e.message}")
+                        binding.favicon.setImageResource(R.drawable.ic_globe)
+                        setIconColorFilter(isActive)
+                    }
+                    
+                    android.util.Log.d("TabAdapter", "Google Favicon servisi kullanılıyor: $faviconUrl")
+                }
             }
         }
     }

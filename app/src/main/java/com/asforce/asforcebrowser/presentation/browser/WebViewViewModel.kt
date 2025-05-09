@@ -49,19 +49,25 @@ class WebViewViewModel @Inject constructor(
             
             // Favicon varsa kaydet ve yolunu al
             if (favicon != null) {
-                viewModelScope.launch {
+                try {
                     // Favicon'u kaydet ve yolunu al
+                    android.util.Log.d("WebViewViewModel", "Favicon için kaydediliyor: TabID=$tabId, URL=$url")
                     faviconPath = FaviconManager.downloadAndSaveFavicon(context, url, tabId)
                     
                     // Eğer favicon yolu alındıysa Tab nesnesini tekrar güncelle
                     if (faviconPath != null) {
+                        android.util.Log.d("WebViewViewModel", "Favicon kaydedildi: TabID=$tabId, Path=$faviconPath")
                         val updatedTabWithFavicon = tab.copy(
                             title = title,
                             url = url,
                             faviconUrl = faviconPath
                         )
                         tabRepository.updateTab(updatedTabWithFavicon)
+                    } else {
+                        android.util.Log.e("WebViewViewModel", "Favicon kaydedilemedi: TabID=$tabId")
                     }
+                } catch (e: Exception) {
+                    android.util.Log.e("WebViewViewModel", "Favicon güncelleme hatası: ${e.message}")
                 }
             }
             

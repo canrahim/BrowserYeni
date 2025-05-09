@@ -38,6 +38,22 @@ object FaviconManager {
     suspend fun downloadAndSaveFavicon(context: Context, url: String, tabId: Long): String? {
         return withContext(Dispatchers.IO) {
             try {
+                // Önce dosya zaten var mı kontrol et (geçersiz dosyaları sil)
+                val existingPath = "$FAVICON_DIRECTORY/favicon_${tabId}.png"
+                val existingFile = File(context.filesDir, existingPath)
+                
+                if (existingFile.exists()) {
+                    // Dosya boyutu sıfır mı kontrol et - geçersiz dosyayı sil
+                    if (existingFile.length() <= 10) { // 10 byte'dan küçükse geçersiz kabul et
+                        Log.d(TAG, "Geçersiz favicon dosyası siliniyor: $existingPath")
+                        existingFile.delete()
+                    } else {
+                        // Mevcut dosya geçerli, şimdilik kullan
+                        Log.d(TAG, "Geçerli favicon dosyası zaten mevcut: $existingPath")
+                        return@withContext existingPath
+                    }
+                }
+                
                 // En iyi favicon URL'ini bul
                 val faviconUrl = findBestFaviconUrl(url)
                 if (faviconUrl.isNullOrEmpty()) {
@@ -52,6 +68,7 @@ object FaviconManager {
                         return@withContext "$FAVICON_DIRECTORY/$fileName"
                     } else {
                         // Alternatif favicon'u indir
+                        Log.d(TAG, "Alternatif favicon URL'i deneniyor: $alternativeFaviconUrl")
                         val bitmap = downloadFavicon(alternativeFaviconUrl)
                         if (bitmap != null) {
                             val fileName = "favicon_${tabId}.png"
@@ -68,6 +85,7 @@ object FaviconManager {
                 }
                 
                 // Favicon'u indir
+                Log.d(TAG, "Favicon URL: $faviconUrl")
                 val bitmap = downloadFavicon(faviconUrl)
                 if (bitmap == null) {
                     Log.w(TAG, "Favicon indirilemedi: $faviconUrl")
@@ -336,10 +354,24 @@ object FaviconManager {
                 directory.mkdirs()
             }
             
-            // Dosyayı kaydet
+            // Önceki dosyayı sil (varsa)
             val file = File(directory, fileName)
+            if (file.exists()) {
+                file.delete()
+                Log.d(TAG, "Eski favicon dosyası silindi: ${file.absolutePath}")
+            }
+            
+            // Dosyayı kaydet
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                out.flush()
+            }
+            
+            Log.d(TAG, "Favicon başarıyla kaydedildi: ${file.absolutePath}, Boyut: ${file.length()} bytes")
+            
+            // Boş veya bozuk dosya kontrolü
+            if (file.length() <= 10) {
+                Log.w(TAG, "Uyarı: Kaydedilen favicon dosyası çok küçük: ${file.length()} bytes")
             }
             
             file.absolutePath

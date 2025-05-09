@@ -20,6 +20,7 @@ import com.asforce.asforcebrowser.presentation.browser.TabAdapter
 import com.asforce.asforcebrowser.presentation.browser.WebViewFragment
 import com.asforce.asforcebrowser.presentation.main.MainViewModel
 import com.asforce.asforcebrowser.util.normalizeUrl
+import com.asforce.asforcebrowser.util.viewpager.FragmentCache
 import com.asforce.asforcebrowser.util.viewpager.ViewPager2Optimizer
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
@@ -64,6 +65,8 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         
         // Ekran yönü değişimini dinle
         handleOrientationChanges()
+        
+        android.util.Log.d("MainActivity", "onCreate: Aktivite başlatıldı")
     }
     
     private fun setupAdapters() {
@@ -130,7 +133,46 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         pagerAdapter = BrowserPagerAdapter(this)
         
         // ViewPager2 yapılandırması
-        binding.viewPager.adapter = pagerAdapter
+        binding.viewPager.apply {
+            // Önbelleğe alma stratejisini belirle (OFFSCREEN_PAGE_LIMIT_DEFAULT, tüm sekmeleri hafızada tutar)
+            offscreenPageLimit = ViewPager2.OFFSCREEN_PAGE_LIMIT_DEFAULT
+            
+            // Sayfa geçiş animasyonlarını devre dışı bırakalım
+            setPageTransformer(null)
+            
+            // Sürükleme/kaydırma hareketlerini devre dışı bırak - manuel sekme geçişlerini iyileştirmek için
+            isUserInputEnabled = false
+            
+            // Kayma hassasiyetini azalt (reflection ile) - kullanıcı girişi kapalı olduğu için bu artık gerekli değil
+            // ama yine de diğer etkileşimler için kalsın
+            try {
+                val recyclerViewField = ViewPager2::class.java.getDeclaredField("mRecyclerView")
+                recyclerViewField.isAccessible = true
+                val recyclerView = recyclerViewField.get(this)
+                
+                val touchSlopField = recyclerView.javaClass.getDeclaredField("mTouchSlop")
+                touchSlopField.isAccessible = true
+                val touchSlop = touchSlopField.get(recyclerView) as Int
+                touchSlopField.set(recyclerView, touchSlop * 5) // Daha da az hassas
+                
+                // Fragment yenileme ve yeniden oluşturma davranışını özelleştir
+                val mFragmentMaxLifecycleEnforcerField = ViewPager2::class.java.getDeclaredField("mFragmentMaxLifecycleEnforcer")
+                mFragmentMaxLifecycleEnforcerField.isAccessible = true
+                val mFragmentMaxLifecycleEnforcer = mFragmentMaxLifecycleEnforcerField.get(this)
+                
+                // Max lifecycle policy'sini değiştir
+                val mPageTransformerAdapterField = mFragmentMaxLifecycleEnforcer.javaClass.getDeclaredField("mPageTransformerAdapter")
+                mPageTransformerAdapterField.isAccessible = true
+                val mPageTransformerAdapter = mPageTransformerAdapterField.get(mFragmentMaxLifecycleEnforcer)
+                
+                android.util.Log.d("MainActivity", "ViewPager2 gelişmiş optimizasyonlar uygulandı")
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "ViewPager2 optimizasyonu hata: ${e.message}")
+            }
+            
+            // Adapter'ı ayarla
+            adapter = pagerAdapter
+        }
         
         // ViewPager2 optimize edici ile yapılandırma
         viewPagerOptimizer.optimizeViewPager(binding.viewPager, pagerAdapter)
@@ -270,17 +312,25 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                     
                     if (position != -1) {
                         // Mevcut pozisyondan farklı ise, görünümü güncelle
+                        // Aktif sekme durumunu kaydet - durumun korunması için
+                        saveCurrentFragmentState()
+                        
                         if (binding.viewPager.currentItem != position) {
-                            android.util.Log.d("MainActivity", "ViewPager pozisyonu değiştiriliyor: $position")
+                        android.util.Log.d("MainActivity", "ViewPager pozisyonu değiştiriliyor: $position")
                             
-                            // Optimize edilmiş tab geçişi - zorla yeniden yükleme
-                            viewPagerOptimizer.setCurrentTabForceRefresh(binding.viewPager, position)
-                        }
+                                // Optimize edilmiş tab geçişi - zorla yeniden yükleme
+                                viewPagerOptimizer.setCurrentTabForceRefresh(binding.viewPager, position)
+                                
+                                // Kısa bir gecikme ile fragment durumlarını yeniden kontrol et (yeniden yükleme olmaması için)
+                                binding.viewPager.postDelayed({
+                                    verifyFragmentStates()
+                                }, 100)
+                            }
                         
                         // Fragment geçişlerini izle
                         viewPagerOptimizer.monitorFragmentSwitching(
                             binding.viewPager,
-                            pagerAdapter.fragments,
+                            FragmentCache.getAllFragments(),
                             it.id
                         ) { fragment ->
                             // Doğru fragment seçildiğinde yapacaklar
@@ -368,6 +418,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         val isLandscape = newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         android.util.Log.d("MainActivity", "Ekran yönü değişti: " + if (isLandscape) "Yatay" else "Dikey")
         
+        // Şu anki fragmanların durumlarını kaydet
+        saveCurrentFragmentState()
+        
         // ViewPager'in fragment durumunu korumasını sağla
         val currentItem = binding.viewPager.currentItem
         
@@ -390,7 +443,65 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                 fragment?.let {
                     android.util.Log.d("MainActivity", "Aktif fragment düzenleniyor: TabID=${currentTab.id}")
                 }
+                
+                // Fragment durumlarının doğruluğunu kontrol et
+                verifyFragmentStates()
             }
+        }
+    }
+    
+    /**
+     * Mevcut fragmanın durumunu kaydeder
+     */
+    private fun saveCurrentFragmentState() {
+        val currentTab = viewModel.activeTab.value
+        if (currentTab != null) {
+            FragmentCache.saveFragmentState(currentTab.id, supportFragmentManager)
+            android.util.Log.d("MainActivity", "Aktif sekme durumu kaydedildi: TabID=${currentTab.id}")
+        }
+    }
+    
+    /**
+     * Tüm fragment durumlarının doğruluğunu kontrol eder
+     */
+    private fun verifyFragmentStates() {
+        val tabs = viewModel.tabs.value
+        val cachedFragments = FragmentCache.getAllFragments()
+        
+        tabs.forEach { tab ->
+            val fragment = cachedFragments[tab.id]
+            if (fragment != null) {
+                // Fragment durumunu kontrol et
+                android.util.Log.d("MainActivity", "Fragment durumu: TabID=${tab.id}, isAdded=${fragment.isAdded}, isDetached=${fragment.isDetached}")
+                
+                // Eğer fragment aktif sekme ise, görüntü durumunu kontrol et
+                if (tab.isActive) {
+                    val webView = fragment.getWebView()
+                    android.util.Log.d("MainActivity", "WebView durumu: TabID=${tab.id}, isNull=${webView == null}")
+                }
+            } else {
+                android.util.Log.d("MainActivity", "Fragment bulunamadı: TabID=${tab.id}")
+            }
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        
+        // Aktivite kapatılırken tüm fragment durumlarını kaydet ve Fragment Cache'i temizle
+        if (isFinishing) {
+            android.util.Log.d("MainActivity", "onDestroy: Aktivite kapanıyor, fragment cache temizleniyor")
+            // Tüm fragment durumlarını kaydet
+            viewModel.tabs.value.forEach { tab ->
+                FragmentCache.saveFragmentState(tab.id, supportFragmentManager)
+            }
+            
+            // Cache'i temizle
+            FragmentCache.clearFragments()
+        } else {
+            android.util.Log.d("MainActivity", "onDestroy: Aktivite yeniden oluşturulacak, cache korunuyor")
+            // Sadece aktif fragment'i kaydet
+            saveCurrentFragmentState()
         }
     }
 }

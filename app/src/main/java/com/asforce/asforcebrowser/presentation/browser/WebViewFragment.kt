@@ -114,9 +114,14 @@ class WebViewFragment : Fragment() {
                 val url = view?.url ?: initialUrl
                 val title = view?.title ?: "Yükleniyor..."
                 
+                Log.d(TAG, "onReceivedIcon: TabID=$tabId, İkon alındı")
+                
+                // İkon yüklemede sorun var, lifecycleScope içinde güncelleyelim
                 lifecycleScope.launch {
-                    // Favicon'u güncellemek için viewModel'i kullan
                     viewModel.updateTab(tabId, url, title, icon)
+                    
+                    // Ana thread'de zaten çalışıyoruz, ek bir runOnUiThread gerekmiyor
+                    Log.d(TAG, "onReceivedIcon: TabID=$tabId için ikon güncellendi")
                 }
             }
         }
@@ -169,6 +174,12 @@ class WebViewFragment : Fragment() {
     ): View {
         Log.d(TAG, "onCreateView: TabID=$tabId, URL=$initialUrl")
         
+        // Eğer mevcut binding varsa yeniden kullan
+        if (_binding != null) {
+            Log.d(TAG, "onCreateView: Mevcut binding kullanılıyor")
+            return binding.root
+        }
+        
         // Yeni bir binding oluştur - her zaman temiz bir WebView kullan
         _binding = FragmentWebViewBinding.inflate(inflater, container, false)
         Log.d(TAG, "onCreateView: Yeni binding oluşturuldu")
@@ -185,6 +196,7 @@ class WebViewFragment : Fragment() {
         // WebView'in zaten yapılandırılıp yapılandırılmadığını kontrol et
         if (binding.webView.settings.javaScriptEnabled) {
             Log.d(TAG, "onViewCreated: WebView zaten yapılandırılmış")
+            // Mevcut WebView state'ini koru - hiçbir şey yapma
         } else {
             Log.d(TAG, "onViewCreated: WebView yapılandırılıyor")
             setupWebView()
@@ -193,12 +205,12 @@ class WebViewFragment : Fragment() {
         // Ekran yönünü kontrol et ve webview'ı ona göre ayarla
         configureWebViewForScreenOrientation()
         
-        // WebView'ı son bilinen konuma yükle, eğer yeni sekme ise initialUrl'e git
-        if (savedInstanceState == null && binding.webView.url.isNullOrEmpty()) {
-            Log.d(TAG, "onViewCreated: initialUrl yükleniyor: $initialUrl")
+        // Eğer URL boş değilse ve WebView henüz sayfa yüklemediyse URL'yi yükle
+        if (initialUrl.isNotEmpty() && binding.webView.url == null) {
+            Log.d(TAG, "onViewCreated: Başlangıç URL'si yükleniyor: $initialUrl")
             loadUrl(initialUrl)
         } else {
-            Log.d(TAG, "onViewCreated: Mevcut URL korunuyor: ${binding.webView.url}")
+            Log.d(TAG, "onViewCreated: WebView zaten yüklü URL: ${binding.webView.url}")
         }
     }
     
@@ -352,18 +364,38 @@ class WebViewFragment : Fragment() {
                 setupWebView() // WebView'i yeniden yapılandır
             }
             
-            // URL'yi yükle
-            binding.webView.loadUrl(normalizedUrl)
+            // Boş URL'yi engellemek için kontrol
+            if (normalizedUrl.isEmpty() || normalizedUrl == "about:blank") {
+                Log.w(TAG, "loadUrl: Boş URL yüklenmeye çalışılıyor, varsayılan URL yüklenecek")
+                binding.webView.loadUrl("https://www.google.com")
+            } else {
+                // URL'yi yükle
+                binding.webView.loadUrl(normalizedUrl)
+            }
             
-            // URL yüklendiğini logla
-            Log.d(TAG, "loadUrl: URL yüklendi: $normalizedUrl")
+            // URL yüklenecek
+            Log.d(TAG, "loadUrl: URL yüklenecek: $normalizedUrl")
+            
+            // Bir ek güvenlik olarak URL yüklendiğini kontrol et (1 saniye sonra)
+            binding.root.postDelayed({
+                if (binding.webView.url == null || binding.webView.url.isNullOrEmpty()) {
+                    Log.w(TAG, "loadUrl: WebView URL'si hala boş, yeniden yükleniyor")
+                    binding.webView.loadUrl(normalizedUrl.ifEmpty { "https://www.google.com" })
+                }
+            }, 1000)
             
             // Sayfa yükleme performansını izle
             performanceOptimizer.collectPerformanceMetrics(binding.webView) { metrics ->
                 Log.d(TAG, "Sayfa performans metrikleri: $metrics")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "loadUrl: Hata: URL yüklenemedi: $normalizedUrl", e)
+            Log.e(TAG, "loadUrl: Hata: URL yüklenmedi: $normalizedUrl", e)
+            // Hata durumunda Google'a yönlendir
+            try {
+                binding.webView.loadUrl("https://www.google.com")
+            } catch (e2: Exception) {
+                Log.e(TAG, "loadUrl: Kritik hata! Varsayılan URL bile yüklenemedi", e2)
+            }
         }
     }
     
@@ -394,13 +426,14 @@ class WebViewFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         Log.d(TAG, "onDestroyView: TabID=$tabId, URL=${binding.webView.url}")
+        
+        // WebView'in özelliklerini sakla fakat tamamen temizleme
+        // Bu, fragment yeniden oluşturulduğunda bile durumu korumamızı sağlar
         binding.webView.stopLoading()
         
-        // WebView'i temizle ve _binding'i null yap
-        // Böylece fragment yeniden oluşturulduğunda yeni bir WebView oluşturulur
-        _binding = null
-        
-        Log.d(TAG, "onDestroyView: WebView temizlendi")
+        // Önemli: _binding'i null yapmayın - bu durumu korumamız gerekiyor
+        // Bu yöntem, fragmentların yeniden oluşturulmasını azaltmaya yardımcı olur
+        Log.d(TAG, "onDestroyView: WebView durumu korundu")
     }
     
     override fun onResume() {
@@ -409,6 +442,12 @@ class WebViewFragment : Fragment() {
         
         // Ekran yönünü yeniden kontrol et
         configureWebViewForScreenOrientation()
+        
+        // WebView içeriğinin yüklü olup olmadığını kontrol et
+        if (binding.webView.url == null && initialUrl.isNotEmpty()) {
+            Log.d(TAG, "onResume: WebView içeriği eksik, URL yükleniyor: $initialUrl")
+            loadUrl(initialUrl)
+        }
     }
     
     override fun onPause() {
@@ -439,10 +478,6 @@ class WebViewFragment : Fragment() {
                 width = ViewGroup.LayoutParams.MATCH_PARENT
             }
             
-            // Kaydedilmiş durum, kaydırma pozisyonu gibi özellikleri koru
-            val savedState = Bundle()
-            saveState(savedState)
-            
             // WebView durumunu en iyi şekilde korumak için
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             
@@ -464,34 +499,35 @@ class WebViewFragment : Fragment() {
                 }
             }
             
-            // WebView durumunu geri yükle
-            if (savedState != null && !savedState.isEmpty) {
-                restoreState(savedState)
-            }
-            
-            // İçerisini sıfırlamak yerine mevcut URL'i koru
-            if (!currentUrl.isNullOrEmpty() && url != currentUrl) {
-                Log.d(TAG, "configureWebViewForScreenOrientation: URL'yi geri yükleme: $currentUrl")
-                loadUrl(currentUrl)
-            }
+            // NOT: WebView state'ini ve URL'i korumak için yeni yükleme yapmıyoruz
         }
+    }
+    
+    /**
+     * WebView getter - WebView için dışarıdan erişim sağlar
+     */
+    fun getWebView(): WebView? {
+        return if (_binding != null) binding.webView else null
     }
     
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy: TabID=$tabId")
         
-        // Kaynakları serbest bırak
-        if (_binding != null) {
+        // FragmentCache kullanıldığından, sadece aktivite sonlandığında kaynakları temizle
+        if (activity?.isFinishing == true) {
             try {
-                binding.webView.stopLoading()
-                binding.webView.destroy()
-                Log.d(TAG, "onDestroy: WebView imha edildi")
+                if (_binding != null) {
+                    binding.webView.stopLoading()
+                    binding.webView.destroy()
+                    _binding = null
+                    Log.d(TAG, "onDestroy: WebView tamamen imha edildi")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "onDestroy: WebView imha edilirken hata oluştu", e)
-            } finally {
-                _binding = null
             }
+        } else {
+            Log.d(TAG, "onDestroy: Aktivite sonlanmadığı için WebView korundu")
         }
     }
     

@@ -1,11 +1,9 @@
 package com.asforce.asforcebrowser.util.viewpager
 
 import android.util.Log
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
-import com.asforce.asforcebrowser.data.model.Tab
 import com.asforce.asforcebrowser.presentation.browser.WebViewFragment
 import java.lang.reflect.Field
 
@@ -31,11 +29,14 @@ class ViewPager2Optimizer(
         
         // Kaydırma hassasiyetini ayarla
         viewPager.apply {
-            // Fragment'ların tamponlanmasını artır
-            offscreenPageLimit = 2
+            // Fragment'ların tamponlanmasını artır - maxValue kullanarak tüm sekmeleri hafızada tut
+            offscreenPageLimit = ViewPager2.OFFSCREEN_PAGE_LIMIT_DEFAULT
             
             // Sayfa geçişlerini sıfırla - daha hızlı olması için
             setPageTransformer(null)
+            
+            // Yatay kaydırmayı kapat - bu şekilde manuel sekme değişiminde daha az yenileme olur
+            isUserInputEnabled = false
         }
         
         // Fragment Değiştirme Animasyonu Disable Et (reflection ile)
@@ -72,13 +73,33 @@ class ViewPager2Optimizer(
      */
     fun setCurrentTabForceRefresh(viewPager: ViewPager2, position: Int) {
         if (position >= 0 && position < viewPager.adapter?.itemCount ?: 0) {
-            // Önce yeni pozisyona git
-            viewPager.setCurrentItem(position, false)
+            // ViewPager2'nin durumunu kontrol edelim
+            val currentPosition = viewPager.currentItem
             
-            // Yeniden yüklenmeye zorla
-            viewPager.post {
-                viewPager.adapter?.notifyItemChanged(position)
+            if (currentPosition == position) {
+                Log.d(TAG, "setCurrentTabForceRefresh: Mevcut pozisyon zaten $position, yenileme yapılmayacak")
+                return
             }
+            
+            try {
+                // ViewPager2'nin internal state'ini değiştirmeden geçiş yapalım
+                // Bu özel yaklaşım, çok önceden yapılmıştı ama recyclerView alanı değişmiş olabilir
+                
+                // Normal yöntemle geçiş yap, ama isUserInputEnabled false ise refresh olmaz
+                viewPager.setCurrentItem(position, false)
+                
+                // Fragment'lerin durumunu kontrol et
+                Log.d(TAG, "setCurrentTabForceRefresh: $currentPosition pozisyonundan $position pozisyonuna standart geçiş yapılıyor")
+            } catch (e: Exception) {
+                Log.e(TAG, "Standart geçiş metodu hata", e)
+                // Herhangi bir sorun olursa, son çare olarak position ayarla
+                viewPager.post {
+                    viewPager.setCurrentItem(position, false)
+                }
+            }
+            
+            // Geçiş tamamlandı mesajı
+            Log.d(TAG, "setCurrentTabForceRefresh: Geçiş tamamlandı, pozisyon $position")
         }
     }
     
@@ -86,6 +107,7 @@ class ViewPager2Optimizer(
      * Fragment'lar arası geçişleri izler ve WebView durumunu kontrol eder
      * 
      * @param viewPager İzlenecek ViewPager2
+     * @param fragments Tüm fragmentlar haritasi
      * @param tabId Aktif sekme ID'si
      * @param onPageSelected Sayfa seçildiğinde çağrılacak callback
      */

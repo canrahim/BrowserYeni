@@ -4,11 +4,12 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.asforce.asforcebrowser.data.model.Tab
+import com.asforce.asforcebrowser.util.viewpager.FragmentCache
 
 /**
  * BrowserPagerAdapter - Sekmeler arası geçiş için ViewPager2 adapter'ı
  * 
- * Her sekme için bir WebViewFragment oluşturur ve yönetir.
+ * Her sekme için FragmentCache üzerinden bir WebViewFragment yönetir.
  * Referans: ViewPager2 ile Fragment yönetimi
  */
 class BrowserPagerAdapter(
@@ -19,16 +20,26 @@ class BrowserPagerAdapter(
     // İzleme için log tag'i
     private val TAG = "BrowserPagerAdapter"
 
-    // Fragment'lara dışarıdan da erişilebilmesi için public
-val fragments = mutableMapOf<Long, WebViewFragment>()
-    
-    // Fragment'ın yeniden oluşturulmasını kontrol etmek için
+    // Adapter yeniden oluştuğunda fragmentların yeniden oluşmasını önlemek için bir anahtar kullanıyoruz
+    private val uniqueId = System.currentTimeMillis()
+
     override fun getItemId(position: Int): Long {
-        return if (position < tabs.size) tabs[position].id else position.toLong()
+        val id = if (position < tabs.size) tabs[position].id else position.toLong()
+        android.util.Log.d(TAG, "getItemId: Pozisyon=$position, ID=$id")
+        return id
     }
     
     override fun containsItem(itemId: Long): Boolean {
-        return tabs.any { it.id == itemId }
+        // Fragment önbellekte varsa her zaman true döndür
+        val containsInCache = FragmentCache.getFragment(itemId) != null
+        
+        // Tabs listesinde var mı kontrol et
+        val containsInTabs = tabs.any { it.id == itemId }
+        
+        // Sonucu logla ve döndür
+        val result = containsInCache || containsInTabs
+        android.util.Log.d(TAG, "containsItem: ID=$itemId, Önbellekte=$containsInCache, Sekmede=$containsInTabs, Sonuç=$result")
+        return result
     }
 
     override fun getItemCount(): Int {
@@ -38,13 +49,14 @@ val fragments = mutableMapOf<Long, WebViewFragment>()
     }
 
     override fun createFragment(position: Int): Fragment {
-        val tab = tabs[position]
-        val fragment = WebViewFragment.newInstance(tab.id, tab.url)
+        val tab = if (position < tabs.size) tabs[position] else return Fragment()
+
+        android.util.Log.d(TAG, "createFragment: Pozisyon=$position için fragment istendi TabID=${tab.id}")
         
-        // Fragment referansını sakla
-        fragments[tab.id] = fragment
+        // FragmentCache'den mevcut fragment'ı al veya yeni oluştur
+        val fragment = FragmentCache.getOrCreateFragment(tab.id, tab.url)
         
-        android.util.Log.d(TAG, "createFragment: Pozisyon=$position, TabID=${tab.id}, URL=${tab.url}")
+        android.util.Log.d(TAG, "createFragment: Fragment oluşturuldu/döndürüldü: Pozisyon=$position, TabID=${tab.id}")
         return fragment
     }
 
@@ -59,20 +71,31 @@ val fragments = mutableMapOf<Long, WebViewFragment>()
         val oldTabIds = tabs.map { it.id }
         val newTabIds = newTabs.map { it.id }
         
+        // Silinen sekmeleri tespit et
+        val removedTabIds = oldTabIds.filterNot { it in newTabIds }
+        
+        // Silinen sekmelerin fragment kayıtlarını temizle
+        removedTabIds.forEach { tabId ->
+            FragmentCache.removeFragment(tabId)
+            android.util.Log.d(TAG, "updateTabs: Fragment silindi: TabID=$tabId")
+        }
+        
         tabs.clear()
         tabs.addAll(newTabs)
         
-        // ViewPager2'yi yenile
-        notifyDataSetChanged()
+        android.util.Log.d(TAG, "updateTabs: Eski ID'ler=$oldTabIds, Yeni ID'ler=$newTabIds, Silinenler=$removedTabIds")
         
-        android.util.Log.d(TAG, "updateTabs: Eski ID'ler=$oldTabIds, Yeni ID'ler=$newTabIds")
+        // Sadece gerekli öğelerin güncellenmesini sağla - tüm listeyi yenileme
+        if (removedTabIds.isNotEmpty() || oldTabIds.size != newTabIds.size) {
+            notifyDataSetChanged()
+        }
     }
 
     /**
      * ID'ye göre fragment'ı döndürür
      */
     fun getFragmentByTabId(tabId: Long): WebViewFragment? {
-        val fragment = fragments[tabId]
+        val fragment = FragmentCache.getFragment(tabId)
         android.util.Log.d(TAG, "getFragmentByTabId: ID=$tabId, Fragment ${if (fragment != null) "bulundu" else "bulunamadı"}")
         return fragment
     }
