@@ -190,6 +190,9 @@ class WebViewFragment : Fragment() {
             setupWebView()
         }
         
+        // Ekran yönünü kontrol et ve webview'ı ona göre ayarla
+        configureWebViewForScreenOrientation()
+        
         // WebView'ı son bilinen konuma yükle, eğer yeni sekme ise initialUrl'e git
         if (savedInstanceState == null && binding.webView.url.isNullOrEmpty()) {
             Log.d(TAG, "onViewCreated: initialUrl yükleniyor: $initialUrl")
@@ -403,11 +406,75 @@ class WebViewFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume: TabID=$tabId, URL=${binding.webView.url}")
+        
+        // Ekran yönünü yeniden kontrol et
+        configureWebViewForScreenOrientation()
     }
     
     override fun onPause() {
         super.onPause()
         Log.d(TAG, "onPause: TabID=$tabId, URL=${binding.webView.url}")
+    }
+    
+    /**
+     * Ekran yönüne göre WebView'i yapılandırır
+     * 
+     * Dikey ve yatay mod için farklı ayarlar kullanır.
+     */
+    private fun configureWebViewForScreenOrientation() {
+        // Current URL'i kaydet
+        val currentUrl = binding.webView.url
+        
+        // Ekran yönünü al
+        val orientation = resources.configuration.orientation
+        val isLandscape = orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        
+        Log.d(TAG, "configureWebViewForScreenOrientation: Yatay mod=$isLandscape, URL=$currentUrl")
+        
+        // WebView'i ekran yönüne göre yapılandır
+        binding.webView.apply {
+            // Yatay mod için WebView yükseklik/genişlik parametrelerini ayarla
+            layoutParams = layoutParams.apply {
+                height = ViewGroup.LayoutParams.MATCH_PARENT
+                width = ViewGroup.LayoutParams.MATCH_PARENT
+            }
+            
+            // Kaydedilmiş durum, kaydırma pozisyonu gibi özellikleri koru
+            val savedState = Bundle()
+            saveState(savedState)
+            
+            // WebView durumunu en iyi şekilde korumak için
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            
+            // Ekran yönüne göre kaydırma davranışı optimize et
+            if (isLandscape) {
+                // Yatay mod için özel ayarlar
+                overScrollMode = View.OVER_SCROLL_NEVER
+                settings.apply {
+                    // Yatay moddaki performans iyileştirmeleri
+                    setNeedInitialFocus(false)
+                    layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
+                }
+            } else {
+                // Dikey mod için özel ayarlar
+                overScrollMode = View.OVER_SCROLL_NEVER
+                settings.apply {
+                    // Dikey mod için standart ayarlar
+                    layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
+                }
+            }
+            
+            // WebView durumunu geri yükle
+            if (savedState != null && !savedState.isEmpty) {
+                restoreState(savedState)
+            }
+            
+            // İçerisini sıfırlamak yerine mevcut URL'i koru
+            if (!currentUrl.isNullOrEmpty() && url != currentUrl) {
+                Log.d(TAG, "configureWebViewForScreenOrientation: URL'yi geri yükleme: $currentUrl")
+                loadUrl(currentUrl)
+            }
+        }
     }
     
     override fun onDestroy() {

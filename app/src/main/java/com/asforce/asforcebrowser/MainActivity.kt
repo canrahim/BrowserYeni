@@ -61,6 +61,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         setupAdapters()
         setupListeners()
         observeViewModel()
+        
+        // Ekran yönü değişimini dinle
+        handleOrientationChanges()
     }
     
     private fun setupAdapters() {
@@ -336,5 +339,58 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     
     override fun onProgressChanged(progress: Int) {
         // İlerleme çubuğu özellikleri burada ayarlanabilir
+    }
+    
+    /**
+     * Ekran yönü değişikliğini yönetir
+     * 
+     * AndroidManifest.xml'deki configChanges sayesinde Activity yeniden oluşturulmaz
+     * ancak layout'un yeniden düzenlenmesi gerekebilir.
+     */
+    private fun handleOrientationChanges() {
+        // Ekran yönü değişikliği için dinleyici
+        val currentOrientation = resources.configuration.orientation
+        android.util.Log.d("MainActivity", "Ekran yönü: " + 
+            if (currentOrientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) "Yatay" else "Dikey")
+        
+        // configChanges kullanıldığı için onConfigurationChanged callback metodumuzu ekleyelim
+    }
+    
+    /**
+     * Ekran yönü değiştiğinde çağrılır
+     * 
+     * Bu metot configChanges değeri belirtildiği için çağrılır
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        
+        // Ekran yönünü logla
+        val isLandscape = newConfig.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        android.util.Log.d("MainActivity", "Ekran yönü değişti: " + if (isLandscape) "Yatay" else "Dikey")
+        
+        // ViewPager'in fragment durumunu korumasını sağla
+        val currentItem = binding.viewPager.currentItem
+        
+        // ViewPager2 optimizasyonunu yeniden uygula
+        viewPagerOptimizer.optimizeViewPager(binding.viewPager, pagerAdapter)
+        
+        // Seçili sekmenin WebView içeriğini yeniden düzenle
+        val currentTab = viewModel.activeTab.value
+        if (currentTab != null) {
+            val fragment = pagerAdapter.getFragmentByTabId(currentTab.id)
+            
+            // Fragment yeniden yüklenmek zorunda kalmadan, içerik yeniden düzenlenecek
+            binding.viewPager.post {
+                // Geçerli sekme pozisyonuna geri dön
+                if (binding.viewPager.currentItem != currentItem) {
+                    binding.viewPager.setCurrentItem(currentItem, false)
+                }
+                
+                // Uygun fragment bulunduysa, fragmenti yeniden oluşturmadan güncelle
+                fragment?.let {
+                    android.util.Log.d("MainActivity", "Aktif fragment düzenleniyor: TabID=${currentTab.id}")
+                }
+            }
+        }
     }
 }
