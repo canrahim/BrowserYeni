@@ -98,13 +98,27 @@ class WebViewFragment : Fragment() {
 
         override fun onReceivedIcon(view: WebView?, icon: Bitmap?) {
             super.onReceivedIcon(view, icon)
-            if (icon != null) {
-                val url = view?.url ?: initialUrl
-                val title = view?.title ?: "Yükleniyor..."
+            
+            // Favicon alındığında hem tab verilerini hem de FaviconManager'a bildir
+            if (view != null) {
+                val url = view.url ?: initialUrl
+                val title = view.title ?: "Yükleniyor..."
 
-                // İkon yüklemede sorun var, lifecycleScope içinde güncelleyelim
+                // Önce sekme verilerini güncelle
                 lifecycleScope.launch {
                     viewModel.updateTab(tabId, url, title, icon)
+                    
+                    // Favicon'u kaızak için ayrıca FaviconManager'a kaydet
+                    if (icon != null && url.isNotEmpty()) {
+                        requireContext().let { context ->
+                            // FaviconManager'a favicon'u kaydet
+                            com.asforce.asforcebrowser.util.FaviconManager.downloadAndSaveFavicon(
+                                context,
+                                url,
+                                tabId
+                            )
+                        }
+                    }
                 }
             }
         }

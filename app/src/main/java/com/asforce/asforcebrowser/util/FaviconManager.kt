@@ -15,10 +15,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.URL
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.net.HttpURLConnection
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * FaviconManager - Web sitelerinin favicon'larını yönetmek için yardımcı sınıf
@@ -30,19 +30,22 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object FaviconManager {
     private const val FAVICON_DIRECTORY = "favicons"
-    private const val CONNECTION_TIMEOUT = 8000 // 8 saniye (artırıldı - kararlılık için)
-    private const val READ_TIMEOUT = 8000 // 8 saniye (artırıldı - kararlılık için)
-    private const val MIN_FAVICON_SIZE = 100 // Minimum geçerli dosya boyutu (byte)
+    private const val CONNECTION_TIMEOUT = 10000 // 10 saniye (artırıldı)
+    private const val READ_TIMEOUT = 10000 // 10 saniye (artırıldı)
+    private const val MIN_FAVICON_SIZE = 50 // Minimum geçerli dosya boyutu (azaltıldı)
 
     // Favicon önbelleği - aynı domain için tekrar tekrar indirmemek için
     private val faviconCache = ConcurrentHashMap<String, String>()
+    
+    // Pending favicon indirme işlemleri - aynı favicon'u tekrar indirmemek için
+    private val pendingDownloads = ConcurrentHashMap<String, Deferred<String?>>()
 
     /**
-     * Favicon'u indirerek saklar
-     * 
-     * Düzelti: Daha güvenilir dosya validasyonu ve hata yönetimi
+     * Favicon'u indirerek saklar - önce mevcut/önbellekteki versiyonu kontrol eder
      */
     suspend fun downloadAndSaveFavicon(context: Context, url: String, tabId: Long): String? {
+        if (url.isBlank()) return null
+        
         return withContext(Dispatchers.IO) {
             try {
                 // Önce favicon dizininin olduğundan emin ol
@@ -51,38 +54,31 @@ object FaviconManager {
                     faviconDir.mkdirs()
                 }
 
-                // Mevcut dosyayı kontrol et ve validasyon yap
+                // Domain'i çıkar
+                val domain = extractDomain(url)
+                
+                // Mevcut favicon'u kontrol et
                 val existingPath = "$FAVICON_DIRECTORY/favicon_${tabId}.png"
                 val existingFile = File(context.filesDir, existingPath)
 
-                if (existingFile.exists()) {
-                    // Dosya boyutu sıfır mı yoksa minimum boyuttan küçük mü?
-                    if (existingFile.length() <= MIN_FAVICON_SIZE) {
-                        // Geçersiz dosyayı sil
-                        existingFile.delete()
-                    } else {
-                        // Dosyayı bitmap olarak yükleyip geçerliliğini kontrol et
-                        try {
-                            val bitmap = BitmapFactory.decodeFile(existingFile.absolutePath)
-                            if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
-                                bitmap.recycle() // Belleği serbest bırak
-                                return@withContext existingPath
-                            }
-                            existingFile.delete() // Bozuk dosyayı sil
-                        } catch (e: Exception) {
-                            existingFile.delete() // Okunamayan dosyayı sil
+                if (existingFile.exists() && existingFile.length() > MIN_FAVICON_SIZE) {
+                    // Mevcut favicon geçerli, kontrol et
+                    try {
+                        val bitmap = BitmapFactory.decodeFile(existingFile.absolutePath)
+                        if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
+                            bitmap.recycle()
+                            return@withContext existingPath
                         }
+                    } catch (e: Exception) {
+                        existingFile.delete()
                     }
                 }
 
                 // Domain bazlı önbellekte kontrol et
-                val domain = extractDomain(url)
-                val cachedPath = faviconCache[domain]
-                if (cachedPath != null) {
+                faviconCache[domain]?.let { cachedPath ->
                     val cachedFile = File(context.filesDir, cachedPath)
                     if (cachedFile.exists() && cachedFile.length() > MIN_FAVICON_SIZE) {
                         try {
-                            // Önbelleği test et
                             val testBitmap = BitmapFactory.decodeFile(cachedFile.absolutePath)
                             if (testBitmap != null && testBitmap.width > 0 && testBitmap.height > 0) {
                                 testBitmap.recycle()
@@ -96,40 +92,71 @@ object FaviconManager {
                     }
                 }
 
-                // En iyi favicon URL'ini bul
-                var faviconUrl = findBestFaviconUrl(url)
-                
-                if (faviconUrl.isNullOrEmpty()) {
-                    // Alternatif favicon kaynaklarını dene
-                    faviconUrl = tryAlternativeFaviconSources(url)
+                // Aynı domain için zaten indirme işlemi başlatılmışsa bekle
+                val domainKey = "download_$domain"
+                val existingJob = pendingDownloads[domainKey]
+                if (existingJob != null && existingJob.isActive) {
+                    try {
+                        val result = withTimeout(5.seconds) {
+                            existingJob.await()
+                        }
+                        result?.let {
+                            val cachedFile = File(context.filesDir, it)
+                            if (cachedFile.exists()) {
+                                cachedFile.copyTo(existingFile, overwrite = true)
+                                return@withContext existingPath
+                            }
+                        }
+                    } catch (e: TimeoutCancellationException) {
+                        // Timeout olursa devam et
+                    }
                 }
 
-                var bitmap: Bitmap? = null
-                
-                if (!faviconUrl.isNullOrEmpty()) {
-                    // Favicon'u indir
-                    bitmap = downloadFavicon(faviconUrl)
+                // Yeni indirme işlemi başlat
+                val downloadJob = async {
+                    downloadFaviconInternal(context, url, domain)
                 }
-
-                // Hala bitmap yoksa, domain'den favicon oluştur
-                if (bitmap == null) {
-                    bitmap = generateFaviconFromDomain(url)
-                }
-
-                // Bitmap'i dosyaya kaydet
-                val fileName = "favicon_${tabId}.png"
-                val savedPath = saveFaviconToFile(context, bitmap, fileName)
                 
-                if (savedPath != null) {
-                    // Başarılıysa önbelleğe ekle
-                    faviconCache[domain] = "$FAVICON_DIRECTORY/$fileName"
+                pendingDownloads[domainKey] = downloadJob
+                
+                try {
+                    // İndirme işlemini gerçekleştir
+                    val downloadedPath = downloadJob.await()
+                    
+                    if (downloadedPath != null) {
+                        val downloadedFile = File(context.filesDir, downloadedPath)
+                        if (downloadedFile.exists() && downloadedFile != existingFile) {
+                            downloadedFile.copyTo(existingFile, overwrite = true)
+                        }
+                        // Önbelleğe ekle
+                        faviconCache[domain] = downloadedPath
+                        return@withContext existingPath
+                    }
+                    
+                    // İndirme başarısız, Google API'yi dene
+                    val googleBitmap = tryGoogleFaviconAPI(url)
+                    if (googleBitmap != null) {
+                        val fileName = "favicon_${tabId}.png"
+                        val savedPath = saveFaviconToFile(context, googleBitmap, fileName)
+                        if (savedPath != null) {
+                            faviconCache[domain] = "$FAVICON_DIRECTORY/$fileName"
+                            return@withContext "$FAVICON_DIRECTORY/$fileName"
+                        }
+                    }
+                    
+                    // Son çare: domain'den favicon oluştur
+                    val generatedBitmap = generateFaviconFromDomain(url)
+                    val fileName = "favicon_${tabId}.png"
+                    saveFaviconToFile(context, generatedBitmap, fileName)
                     return@withContext "$FAVICON_DIRECTORY/$fileName"
+                    
+                } finally {
+                    pendingDownloads.remove(domainKey)
                 }
-
-                null
+                
             } catch (e: Exception) {
                 e.printStackTrace()
-                // Hata durumunda bile bir favicon oluştur
+                // Hata durumunda domain'den favicon oluştur
                 try {
                     val bitmap = generateFaviconFromDomain(url)
                     val fileName = "favicon_${tabId}.png"
@@ -144,6 +171,66 @@ object FaviconManager {
     }
 
     /**
+     * Favicon indirme işleminin asıl gerçekleştirildiği fonksiyon
+     */
+    private suspend fun downloadFaviconInternal(context: Context, url: String, domain: String): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Önce web sayfasından favion URL'ini bul
+                var faviconUrl: String? = null
+                
+                // 1. Önce HTML içinden favicon araştır
+                try {
+                    faviconUrl = findBestFaviconUrl(url)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                
+                // 2. HTML'den bulunamazsa standart favicon.ico'yu dene
+                if (faviconUrl.isNullOrEmpty()) {
+                    val baseUrl = extractBaseUrl(url)
+                    faviconUrl = "$baseUrl/favicon.ico"
+                }
+                
+                // Favicon'u indir
+                if (!faviconUrl.isNullOrEmpty()) {
+                    val bitmap = downloadFavicon(faviconUrl)
+                    if (bitmap != null) {
+                        val fileName = "favicon_${domain.hashCode()}.png"
+                        val savedPath = saveFaviconToFile(context, bitmap, fileName)
+                        if (savedPath != null) {
+                            return@withContext "$FAVICON_DIRECTORY/$fileName"
+                        }
+                    }
+                }
+                
+                null
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+    }
+
+    /**
+     * Google Favicon API'sini kullanarak favicon indirir
+     */
+    private suspend fun tryGoogleFaviconAPI(url: String): Bitmap? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val domain = extractDomain(url)
+                if (domain.isBlank()) return@withContext null
+                
+                val googleUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=64"
+                downloadFavicon(googleUrl)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+    }
+
+    /**
      * Web sayfasını parse ederek en iyi favicon URL'ini bulur
      */
     private suspend fun findBestFaviconUrl(url: String): String? {
@@ -152,16 +239,15 @@ object FaviconManager {
                 val baseUrl = extractBaseUrl(url)
                 val cleanUrl = prepareUrl(url)
                 
-                // HTML'i indir ve parse et - daha güvenilir bağlantı ayarları
+                // HTML'i kısa timeout ile indir
                 val connection = Jsoup.connect(cleanUrl)
                     .timeout(CONNECTION_TIMEOUT)
                     .followRedirects(true)
                     .maxBodySize(1024 * 1024) // 1MB sınırı
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .userAgent("Mozilla/5.0 (Android 12) Chrome/120.0.0.0 Mobile")
                     .ignoreHttpErrors(true)
                     .ignoreContentType(true)
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-                    .header("Accept-Language", "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7")
+                    .method(org.jsoup.Connection.Method.GET)
 
                 val doc: Document = connection.get()
 
@@ -233,7 +319,6 @@ object FaviconManager {
 
         var bestElement = iconElements.first()
         var bestSize = 0
-        var hasSvg = false
 
         for (element in iconElements) {
             val type = element.attr("type").lowercase()
@@ -266,23 +351,6 @@ object FaviconManager {
         return text.split("x", "X", ",", " ")
             .mapNotNull { it.toIntOrNull() }
             .maxOrNull() ?: 0
-    }
-
-    /**
-     * Alternatif favicon kaynaklarını dener
-     */
-    private suspend fun tryAlternativeFaviconSources(url: String): String? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val domain = extractDomain(url)
-                
-                // Google Favicon API'sini dene
-                "https://www.google.com/s2/favicons?domain=$domain&sz=64"
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
-            }
-        }
     }
 
     /**
@@ -342,12 +410,10 @@ object FaviconManager {
 
     /**
      * Domaine dayalı otomatik favicon oluşturur
-     * 
-     * Düzelti: Daha etkileyici ve tutarlı tasarım
      */
     private fun generateFaviconFromDomain(url: String): Bitmap {
         val domain = extractDomain(url)
-        val initial = if (domain.isNotEmpty()) domain[0].uppercase() else "A"
+        val initial = if (domain.isNotEmpty()) domain[0].uppercaseChar().toString() else "A"
 
         // Daha fazla renk seçeneği
         val colors = arrayOf(
@@ -430,8 +496,6 @@ object FaviconManager {
 
     /**
      * Favicon'u belirtilen URL'den indirir
-     * 
-     * Düzelti: Daha güvenilir HTTP bağlantı yönetimi
      */
     private fun downloadFavicon(faviconUrl: String): Bitmap? {
         var connection: HttpURLConnection? = null
@@ -445,8 +509,8 @@ object FaviconManager {
             connection.readTimeout = READ_TIMEOUT
             connection.requestMethod = "GET"
             connection.setRequestProperty("User-Agent", 
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            connection.setRequestProperty("Accept", "image/webp,*/*")
+                "Mozilla/5.0 (Android 12) Chrome/120.0.0.0 Mobile")
+            connection.setRequestProperty("Accept", "image/webp,image/*,*/*;q=0.8")
             connection.doInput = true
             connection.useCaches = true
             
@@ -481,8 +545,6 @@ object FaviconManager {
 
     /**
      * Favicon'u cihaza kaydeder
-     * 
-     * Düzelti: Daha iyi hata yönetimi ve dosya validasyonu
      */
     private fun saveFaviconToFile(context: Context, bitmap: Bitmap, fileName: String): String? {
         return try {
@@ -525,8 +587,6 @@ object FaviconManager {
 
     /**
      * Favicon'u dosyadan yükler
-     * 
-     * Düzelti: Daha güvenli dosya okuma
      */
     fun loadFavicon(context: Context, faviconPath: String?): Bitmap? {
         if (faviconPath == null) return null
@@ -561,6 +621,7 @@ object FaviconManager {
      */
     fun clearCache() {
         faviconCache.clear()
+        pendingDownloads.clear()
     }
 
     /**

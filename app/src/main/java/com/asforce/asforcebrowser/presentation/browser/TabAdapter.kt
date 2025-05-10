@@ -1,16 +1,27 @@
 package com.asforce.asforcebrowser.presentation.browser
 
+import android.graphics.drawable.Drawable
+import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.asforce.asforcebrowser.R
 import com.asforce.asforcebrowser.data.model.Tab
 import com.asforce.asforcebrowser.databinding.ItemTabBinding
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.bumptech.glide.request.target.Target
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -21,7 +32,7 @@ import java.io.File
  *
  * Sekmelerin yatay listesini yönetir ve sekme seçimi, kapatma gibi işlemleri işler.
  * 
- * Düzelti: Aktif sekme arka plan sorununu çözdük
+ * Düzelti: Agresif favicon yükleme stratejisi
  */
 class TabAdapter(
     private val onTabSelected: (Tab) -> Unit,
@@ -32,9 +43,9 @@ class TabAdapter(
     var activeTabId: Long = -1
     private val requestOptions = RequestOptions()
         .skipMemoryCache(false)
-        .diskCacheStrategy(DiskCacheStrategy.ALL)
+        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
         .centerCrop()
-        .override(32, 32)
+        .override(48, 48) // Daha büyük boyut için
         .placeholder(R.drawable.ic_globe)
         .error(R.drawable.ic_globe)
 
@@ -55,7 +66,7 @@ class TabAdapter(
     override fun getItemCount(): Int = tabs.size
 
     /**
-     * Düzelti: Sekme güncellemelerini daha güvenilir hale getirdik
+     * Sekme güncellemelerini daha güvenilir hale getirdik
      */
     fun updateTabs(newTabs: List<Tab>) {
         val diffCallback = TabDiffCallback(tabs, newTabs)
@@ -79,7 +90,7 @@ class TabAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         /**
-         * Düzelti: Sekme seçili/aktif durumunu daha güvenilir şekilde ayarlıyoruz
+         * Sekme seçili/aktif durumunu daha güvenilir şekilde ayarlıyoruz
          */
         fun bind(tab: Tab, isActive: Boolean) {
             binding.apply {
@@ -89,7 +100,7 @@ class TabAdapter(
                 // Aktif sekme durumunu hem root view hem de selected state ile ayarla
                 root.isSelected = isActive
                 
-                // Arka plan rengini direkt ayarla (başlangıçta doğru görünmesi için)
+                // Arka plan rengini direkt ayarla
                 root.background = ContextCompat.getDrawable(root.context, R.drawable.tab_background)
                 
                 // Sekme durumu değiştikten hemen sonra arka planı yenile
@@ -106,8 +117,8 @@ class TabAdapter(
                     closeButton.setColorFilter(ContextCompat.getColor(root.context, R.color.iconTint))
                 }
 
-                // Favicon'u yükle
-                loadFavicon(tab, isActive)
+                // Favicon'u agresif olarak yükle
+                loadFaviconAggressively(tab, isActive)
 
                 // Tıklama işleyicileri
                 root.setOnClickListener {
@@ -120,40 +131,183 @@ class TabAdapter(
             }
         }
 
-        private fun loadFavicon(tab: Tab, isActive: Boolean) {
-            // Önce varsayılan simgeyi göster
-            binding.favicon.setImageResource(R.drawable.ic_globe)
-            setIconColorFilter(isActive)
+        /**
+         * Agresif favicon yükleme stratejisi
+         * 1. Önce Google API'yi dene
+         * 2. Sonra savedlı favicon'u kontrol et
+         * 3. FaviconManager'dan indir
+         * 4. Son çare: varsayılan icon
+         */
+        private fun loadFaviconAggressively(tab: Tab, isActive: Boolean) {
+            // Her zaman Google favicon API'yi önce dene
+            if (tab.url.isNotEmpty()) {
+                tryLoadFromGoogleDirectly(tab, isActive)
+            } else {
+                // URL yoksa varsayılan ikonu göster
+                binding.favicon.setImageResource(R.drawable.ic_globe)
+                setIconColorFilter(isActive)
+            }
+        }
 
-            // Favicon URL kontrolü
+        /**
+         * Doğrudan Google Favicon API'sinden favicon yüklemeyi dener
+         */
+        private fun tryLoadFromGoogleDirectly(tab: Tab, isActive: Boolean) {
+            if (tab.url.isEmpty()) return
+
+            // Web sitesinin domain'ini çıkar
+            val domain = try {
+                val uri = android.net.Uri.parse(tab.url)
+                uri.host ?: ""
+            } catch (e: Exception) {
+                ""
+            }
+
+            if (domain.isNotEmpty()) {
+                // 1. Önce Google API'yi dene
+                val googleFaviconUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=64"
+                
+                Glide.with(binding.root.context.applicationContext)
+                    .load(googleFaviconUrl)
+                    .apply(requestOptions)
+                    .listener(object : RequestListener<Drawable> {
+                        override fun onLoadFailed(
+                            e: GlideException?,
+                            model: Any?,
+                            target: Target<Drawable>?,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            // Google API başarısız olursa, kaydedilmiş favicon'u dene
+                            tryLoadSavedFavicon(tab, isActive)
+                            return true
+                        }
+
+                        override fun onResourceReady(
+                            resource: Drawable?,
+                            model: Any?,
+                            target: Target<Drawable>?,
+                            dataSource: DataSource?,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            if (resource != null) {
+                                // Başarılı, renk filtresini temizle
+                                binding.favicon.clearColorFilter()
+                                
+                                // Ayrıca veritabanına kaydet (arka planda)
+                                if (tab.faviconUrl == null || tab.faviconUrl.isEmpty()) {
+                                    saveGoogleFaviconToDatabase(tab, domain)
+                                }
+                                return false // Glide'ın normal işleyişini devam ettir
+                            }
+                            return true
+                        }
+                    })
+                    .into(binding.favicon)
+            } else {
+                // Domain bulunamazsa varsayılan ikonu göster
+                binding.favicon.setImageResource(R.drawable.ic_globe)
+                setIconColorFilter(isActive)
+            }
+        }
+
+        /**
+         * Kaydedilmiş favicon'u yüklemeyi dener
+         */
+        private fun tryLoadSavedFavicon(tab: Tab, isActive: Boolean) {
             if (tab.faviconUrl != null && tab.faviconUrl!!.isNotEmpty()) {
                 try {
-                    // Favicon dosyasının tam yolu
                     val faviconFile = File(binding.root.context.filesDir, tab.faviconUrl)
-
-                    if (faviconFile.exists() && faviconFile.length() > 100) {
-                        // Dosya mevcutsa ve geçerli boyuttaysa yükle
+                    if (faviconFile.exists() && faviconFile.length() > 50) {
                         Glide.with(binding.root.context.applicationContext)
                             .load(faviconFile)
                             .apply(requestOptions)
-                            .into(binding.favicon)
+                            .listener(object : RequestListener<Drawable> {
+                                override fun onLoadFailed(
+                                    e: GlideException?,
+                                    model: Any?,
+                                    target: Target<Drawable>?,
+                                    isFirstResource: Boolean
+                                ): Boolean {
+                                    // Kaydedilmiş favicon başarısız, FaviconManager'ı dene
+                                    downloadFaviconInBackground(tab, isActive)
+                                    return true
+                                }
 
-                        // Renk filtresini temizle
-                        binding.favicon.clearColorFilter()
+                                override fun onResourceReady(
+                                    resource: Drawable?,
+                                    model: Any?,
+                                    target: Target<Drawable>?,
+                                    dataSource: DataSource?,
+                                    isFirstResource: Boolean
+                                ): Boolean {
+                                    if (resource != null) {
+                                        binding.favicon.clearColorFilter()
+                                        return false
+                                    }
+                                    return true
+                                }
+                            })
+                            .into(binding.favicon)
                     } else {
-                        // Dosya yoksa veya küçükse sil ve Google favicon servisini dene
-                        if (faviconFile.exists()) {
-                            faviconFile.delete()
-                        }
-                        tryLoadFromGoogle(tab, isActive)
+                        // Dosya yok veya çok küçük, arka planda indir
+                        downloadFaviconInBackground(tab, isActive)
                     }
                 } catch (e: Exception) {
-                    // Hata durumunda Google favicon servisini dene
-                    tryLoadFromGoogle(tab, isActive)
+                    // Hata durumunda arka planda indir
+                    downloadFaviconInBackground(tab, isActive)
                 }
-            } else if (tab.url.isNotEmpty()) {
-                // Favicon URL yoksa ama sayfa URL'i varsa Google servisini dene
-                tryLoadFromGoogle(tab, isActive)
+            } else {
+                // Favicon URL yoksa arka planda indir
+                downloadFaviconInBackground(tab, isActive)
+            }
+        }
+
+        /**
+         * Arka planda FaviconManager aracılığıyla favicon indirir
+         */
+        private fun downloadFaviconInBackground(tab: Tab, isActive: Boolean) {
+            // Arka planda favicon indir
+            (binding.root.context as? androidx.lifecycle.LifecycleOwner)?.lifecycleScope?.launch {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val faviconPath = com.asforce.asforcebrowser.util.FaviconManager
+                            .downloadAndSaveFavicon(binding.root.context, tab.url, tab.id)
+                        
+                        withContext(Dispatchers.Main) {
+                            if (faviconPath != null) {
+                                // Başarılı, yeniden yükle
+                                tryLoadSavedFavicon(tab.copy(faviconUrl = faviconPath), isActive)
+                            } else {
+                                // Son çare: varsayılan icon
+                                binding.favicon.setImageResource(R.drawable.ic_globe)
+                                setIconColorFilter(isActive)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        withContext(Dispatchers.Main) {
+                            binding.favicon.setImageResource(R.drawable.ic_globe)
+                            setIconColorFilter(isActive)
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Google'dan indirilen favicon'u veritabanına kaydeder
+         */
+        private fun saveGoogleFaviconToDatabase(tab: Tab, domain: String) {
+            (binding.root.context as? androidx.lifecycle.LifecycleOwner)?.lifecycleScope?.launch {
+                withContext(Dispatchers.IO) {
+                    try {
+                        // FaviconManager aracılığıyla Google'dan indirip kaydet
+                        com.asforce.asforcebrowser.util.FaviconManager
+                            .downloadAndSaveFavicon(binding.root.context, tab.url, tab.id)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
             }
         }
 
@@ -163,45 +317,6 @@ class TabAdapter(
         private fun setIconColorFilter(isActive: Boolean) {
             val colorResId = if (isActive) R.color.iconTintActive else R.color.iconTint
             binding.favicon.setColorFilter(ContextCompat.getColor(binding.root.context, colorResId))
-        }
-
-        /**
-         * Google'un favicon servisinden favicon yüklemeyi dener
-         */
-        private fun tryLoadFromGoogle(tab: Tab, isActive: Boolean) {
-            if (tab.url.isNotEmpty()) {
-                // Web sitesinin ana alan adını çıkar
-                val domain = try {
-                    val uri = android.net.Uri.parse(tab.url)
-                    uri.host ?: ""
-                } catch (e: Exception) {
-                    ""
-                }
-
-                if (domain.isNotEmpty()) {
-                    // Google'un favicon servisini kullan
-                    val faviconUrl = "https://www.google.com/s2/favicons?domain=$domain&sz=64"
-
-                    // Favicon'u Glide ile indir
-                    try {
-                        Glide.with(binding.root.context.applicationContext)
-                            .load(faviconUrl)
-                            .apply(requestOptions)
-                            .into(binding.favicon)
-
-                        // Renk filtresini temizle
-                        binding.favicon.clearColorFilter()
-                    } catch (e: Exception) {
-                        // Varsayılan simgeyi göster
-                        binding.favicon.setImageResource(R.drawable.ic_globe)
-                        setIconColorFilter(isActive)
-                    }
-                } else {
-                    // Domain bulunamazsa varsayılan ikonu göster
-                    binding.favicon.setImageResource(R.drawable.ic_globe)
-                    setIconColorFilter(isActive)
-                }
-            }
         }
     }
 
