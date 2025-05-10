@@ -247,11 +247,22 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     }
 
     private fun observeViewModel() {
-        // Sekme listesini gözlemle
+        // Sekme listesini gözlemle  
         lifecycleScope.launch {
             viewModel.tabs.collectLatest { tabs ->
+                // Önce aktif sekmeyi kontrol et
+                val activeTab = tabs.find { it.isActive }
+                activeTab?.let { tabAdapter.activeTabId = it.id }
+                
                 tabAdapter.updateTabs(tabs)
                 pagerAdapter.updateTabs(tabs)
+                
+                // Başlangıçta sekme görünümlerini yenile
+                if (tabs.isNotEmpty()) {
+                    binding.tabsRecyclerView.post {
+                        tabAdapter.notifyDataSetChanged()
+                    }
+                }
             }
         }
 
@@ -262,6 +273,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                     val position = pagerAdapter.getPositionForTabId(it.id)
 
                     if (position != -1) {
+                        // Aktif sekme ID'sini güncelle
+                        tabAdapter.activeTabId = it.id
+                        
                         // Mevcut pozisyondan farklı ise, görünümü güncelle
                         // Aktif sekme durumunu kaydet - durumun korunması için
                         saveCurrentFragmentState()
@@ -283,6 +297,11 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                             it.id
                         ) { _ ->
                             // Doğru fragment seçildiğinde yapacaklar
+                        }
+                        
+                        // Sekme görünümlerini yenile
+                        binding.tabsRecyclerView.post {
+                            tabAdapter.notifyDataSetChanged()
                         }
                     } else {
                         // Adapter'i yenileme için zorla

@@ -2,6 +2,7 @@ package com.asforce.asforcebrowser.presentation.browser
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.asforce.asforcebrowser.R
@@ -14,8 +15,13 @@ import java.io.File
 
 /**
  * TabAdapter - Sekme listesi için RecyclerView adapter'ı
+ * 
+ * Referans: Android RecyclerView Adapter Guide
+ * https://developer.android.com/guide/topics/ui/layout/recyclerview
  *
  * Sekmelerin yatay listesini yönetir ve sekme seçimi, kapatma gibi işlemleri işler.
+ * 
+ * Düzelti: Aktif sekme arka plan sorununu çözdük
  */
 class TabAdapter(
     private val onTabSelected: (Tab) -> Unit,
@@ -23,7 +29,7 @@ class TabAdapter(
 ) : RecyclerView.Adapter<TabAdapter.TabViewHolder>() {
 
     private val tabs = mutableListOf<Tab>()
-    private var activeTabId: Long = -1
+    var activeTabId: Long = -1
     private val requestOptions = RequestOptions()
         .skipMemoryCache(false)
         .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -48,43 +54,60 @@ class TabAdapter(
 
     override fun getItemCount(): Int = tabs.size
 
+    /**
+     * Düzelti: Sekme güncellemelerini daha güvenilir hale getirdik
+     */
     fun updateTabs(newTabs: List<Tab>) {
         val diffCallback = TabDiffCallback(tabs, newTabs)
         val diffResult = DiffUtil.calculateDiff(diffCallback)
+
+        // Önce aktif sekmeyi belirle
+        val activeTab = newTabs.find { it.isActive }
+        activeTab?.let { this.activeTabId = it.id }
 
         tabs.clear()
         tabs.addAll(newTabs)
 
         diffResult.dispatchUpdatesTo(this)
 
-        // Aktif sekmeyi belirle
-        val activeTab = newTabs.find { it.isActive }
-        activeTab?.let { this.activeTabId = it.id }
+        // UI güncellemesini zorla
+        notifyDataSetChanged()
     }
 
     inner class TabViewHolder(
         private val binding: ItemTabBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
+        /**
+         * Düzelti: Sekme seçili/aktif durumunu daha güvenilir şekilde ayarlıyoruz
+         */
         fun bind(tab: Tab, isActive: Boolean) {
             binding.apply {
                 // Sekme başlığını ayarla
                 tabTitle.text = tab.title.ifEmpty { "Yeni Sekme" }
 
-                // Favicon'u yükle
-                loadFavicon(tab, isActive)
-
-                // Aktif sekme durumunu ayarla
+                // Aktif sekme durumunu hem root view hem de selected state ile ayarla
                 root.isSelected = isActive
+                
+                // Arka plan rengini direkt ayarla (başlangıçta doğru görünmesi için)
+                root.background = ContextCompat.getDrawable(root.context, R.drawable.tab_background)
+                
+                // Sekme durumu değiştikten hemen sonra arka planı yenile
+                root.post {
+                    root.refreshDrawableState()
+                }
 
                 // Aktif sekme için metin ve icon renklerini ayarla
                 if (isActive) {
-                    tabTitle.setTextColor(root.context.getColor(R.color.tabTextActive))
-                    closeButton.setColorFilter(root.context.getColor(R.color.iconTintActive))
+                    tabTitle.setTextColor(ContextCompat.getColor(root.context, R.color.tabTextActive))
+                    closeButton.setColorFilter(ContextCompat.getColor(root.context, R.color.iconTintActive))
                 } else {
-                    tabTitle.setTextColor(root.context.getColor(R.color.tabTextInactive))
-                    closeButton.setColorFilter(root.context.getColor(R.color.iconTint))
+                    tabTitle.setTextColor(ContextCompat.getColor(root.context, R.color.tabTextInactive))
+                    closeButton.setColorFilter(ContextCompat.getColor(root.context, R.color.iconTint))
                 }
+
+                // Favicon'u yükle
+                loadFavicon(tab, isActive)
 
                 // Tıklama işleyicileri
                 root.setOnClickListener {
@@ -108,8 +131,8 @@ class TabAdapter(
                     // Favicon dosyasının tam yolu
                     val faviconFile = File(binding.root.context.filesDir, tab.faviconUrl)
 
-                    if (faviconFile.exists() && faviconFile.length() > 0) {
-                        // Dosya mevcutsa yükle
+                    if (faviconFile.exists() && faviconFile.length() > 100) {
+                        // Dosya mevcutsa ve geçerli boyuttaysa yükle
                         Glide.with(binding.root.context.applicationContext)
                             .load(faviconFile)
                             .apply(requestOptions)
@@ -118,7 +141,10 @@ class TabAdapter(
                         // Renk filtresini temizle
                         binding.favicon.clearColorFilter()
                     } else {
-                        // Dosya yoksa Google favicon servisini dene
+                        // Dosya yoksa veya küçükse sil ve Google favicon servisini dene
+                        if (faviconFile.exists()) {
+                            faviconFile.delete()
+                        }
                         tryLoadFromGoogle(tab, isActive)
                     }
                 } catch (e: Exception) {
@@ -135,11 +161,8 @@ class TabAdapter(
          * Favicon için renk filtresini ayarlar
          */
         private fun setIconColorFilter(isActive: Boolean) {
-            if (isActive) {
-                binding.favicon.setColorFilter(binding.root.context.getColor(R.color.iconTintActive))
-            } else {
-                binding.favicon.setColorFilter(binding.root.context.getColor(R.color.iconTint))
-            }
+            val colorResId = if (isActive) R.color.iconTintActive else R.color.iconTint
+            binding.favicon.setColorFilter(ContextCompat.getColor(binding.root.context, colorResId))
         }
 
         /**
@@ -173,6 +196,10 @@ class TabAdapter(
                         binding.favicon.setImageResource(R.drawable.ic_globe)
                         setIconColorFilter(isActive)
                     }
+                } else {
+                    // Domain bulunamazsa varsayılan ikonu göster
+                    binding.favicon.setImageResource(R.drawable.ic_globe)
+                    setIconColorFilter(isActive)
                 }
             }
         }

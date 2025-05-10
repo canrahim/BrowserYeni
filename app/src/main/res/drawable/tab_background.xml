@@ -1,48 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Referans: Android Selector Drawable Guide -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Aktif sekme -->
+    <!-- Aktif sekme durumu -->
     <item android:state_selected="true">
         <layer-list>
-            <!-- Ana arka plan -->
+            <!-- Ana arka plan - beyaz -->
             <item>
                 <shape android:shape="rectangle">
                     <corners 
                         android:topLeftRadius="8dp" 
-                        android:topRightRadius="8dp" />
-                    <solid android:color="@color/tabBackground" />
+                        android:topRightRadius="8dp"
+                        android:bottomLeftRadius="0dp"
+                        android:bottomRightRadius="0dp" />
+                    <solid android:color="@color/tabBackground" /> <!-- #FFFFFF -->
                 </shape>
             </item>
-            <!-- İnce kenarlık -->
+            <!-- Kenarlık -->
             <item android:bottom="0dp" android:left="0dp" android:right="0dp" android:top="0dp">
                 <shape android:shape="rectangle">
                     <corners 
                         android:topLeftRadius="8dp" 
-                        android:topRightRadius="8dp" />
+                        android:topRightRadius="8dp"
+                        android:bottomLeftRadius="0dp"
+                        android:bottomRightRadius="0dp" />
                     <stroke 
                         android:width="1dp" 
-                        android:color="@color/tabBorderActive" />
+                        android:color="@color/tabBorderActive" /> <!-- #4285F4 -->
                 </shape>
             </item>
-            <!-- Alt çizgi vurgusu -->
+            <!-- Alt vurgu çizgisi -->
             <item android:bottom="0dp" android:left="0dp" android:right="0dp">
                 <shape>
-                    <size android:height="2dp" />
-                    <solid android:color="@color/tabBorderActive" />
+                    <size android:height="3dp" />
+                    <solid android:color="@color/tabBorderActive" /> <!-- #4285F4 -->
                 </shape>
             </item>
         </layer-list>
     </item>
     
-    <!-- Aktif olmayan sekme -->
+    <!-- Aktif olmayan sekme durumu -->
     <item>
         <layer-list>
-            <!-- Ana arka plan -->
+            <!-- Ana arka plan - açık gri -->
             <item>
                 <shape android:shape="rectangle">
                     <corners 
                         android:topLeftRadius="8dp" 
-                        android:topRightRadius="8dp" />
-                    <solid android:color="@color/tabBackgroundInactive" />
+                        android:topRightRadius="8dp"
+                        android:bottomLeftRadius="0dp"
+                        android:bottomRightRadius="0dp" />
+                    <solid android:color="@color/tabBackgroundInactive" /> <!-- #F5F5F5 -->
                 </shape>
             </item>
             <!-- İnce kenarlık -->
@@ -50,10 +57,12 @@
                 <shape android:shape="rectangle">
                     <corners 
                         android:topLeftRadius="8dp" 
-                        android:topRightRadius="8dp" />
+                        android:topRightRadius="8dp"
+                        android:bottomLeftRadius="0dp"
+                        android:bottomRightRadius="0dp" />
                     <stroke 
                         android:width="0.5dp" 
-                        android:color="@color/tabBorderInactive" />
+                        android:color="@color/tabBorderInactive" /> <!-- #E0E0E0 -->
                 </shape>
             </item>
         </layer-list>
