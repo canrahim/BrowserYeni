@@ -75,7 +75,7 @@ class DownloadManager private constructor(context: Context) {
         contextRef.set(applicationContext)
         registerDownloadReceiver()
     }
-    
+
     /**
      * Updates the current activity context.
      * Should be called in Activity.onResume() to ensure we always have a valid Activity context.
@@ -88,7 +88,7 @@ class DownloadManager private constructor(context: Context) {
             Log.d(TAG, "Context updated to: ${context.javaClass.simpleName}")
         }
     }
-    
+
     /**
      * Adds a download to the active downloads map.
      *
@@ -148,15 +148,15 @@ class DownloadManager private constructor(context: Context) {
                 if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
                     val uriIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_LOCAL_URI)
                     val uriString = cursor.getString(uriIndex)
-                    
+
                     // Get MIME type index
                     val mimeTypeIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_MEDIA_TYPE)
                     var mimeType: String? = null
-                    
+
                     if (mimeTypeIndex != -1) {
                         mimeType = cursor.getString(mimeTypeIndex)
                     }
-                    
+
                     // If no MIME type from download, try to determine from filename
                     if (mimeType.isNullOrEmpty() || mimeType == "application/octet-stream") {
                         // Check if this is a JPG file first based on the original filename
@@ -167,10 +167,10 @@ class DownloadManager private constructor(context: Context) {
                             mimeType = getMimeTypeFromFileName(fileName)
                         }
                     }
-                    
+
                     // Additional logging
                     Log.d(TAG, "Download completed - URI: $uriString, MIME: $mimeType")
-                    
+
                     // Ensure we have a URI to work with
                     if (uriString != null) {
                         // Handle file opening on UI thread
@@ -200,27 +200,77 @@ class DownloadManager private constructor(context: Context) {
         }
     }
 
+    // YENI EKLENEN: downloadFile fonksiyonunda PdfForEK için özel işleme
     fun downloadFile(url: String, fileName: String?, mimeType: String?, userAgent: String?, contentDisposition: String?) {
         // Log download parameters for debugging
         Log.d(TAG, "Download request - URL: $url")
         Log.d(TAG, "Original filename: $fileName")
         Log.d(TAG, "Original MIME type: $mimeType")
         Log.d(TAG, "Content-Disposition: $contentDisposition")
-        
+
+        // YENİ EKLENEN: PdfForEK için direkt indirme
+        if (url.contains("/PdfForEK")) {
+            if (!checkStoragePermission()) {
+                Log.e(TAG, "Storage permission not granted, can't download")
+                showToastOnUiThread("İndirme için depolama izni gerekli")
+                return
+            }
+
+            val downloadManager = applicationContext.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+            val request = android.app.DownloadManager.Request(Uri.parse(url))
+
+            // Dosya adını belirle
+            val finalFileName = if (contentDisposition != null) {
+                extractFilenameFromContentDisposition(contentDisposition) ?: "Rapor_${System.currentTimeMillis()}.pdf"
+            } else {
+                fileName ?: "Rapor_${System.currentTimeMillis()}.pdf"
+            }
+
+            // PDF ayarları
+            request.setMimeType("application/pdf")
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName)
+            request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+
+            // User agent ayarla
+            if (!userAgent.isNullOrEmpty()) {
+                request.addRequestHeader("User-Agent", userAgent)
+            }
+
+            // Cookie'leri ekle
+            val cookies = CookieManager.getInstance().getCookie(url)
+            if (!cookies.isNullOrEmpty()) {
+                request.addRequestHeader("Cookie", cookies)
+            }
+
+            // İndirmeyi başlat
+            val downloadId = downloadManager.enqueue(request)
+            addActiveDownload(downloadId, finalFileName)
+
+            // Toast göster
+            Handler(Looper.getMainLooper()).post {
+                showToast(applicationContext.getString(R.string.download_started, finalFileName))
+            }
+
+            // Tamamlandığında açma seçeneği sun
+            registerDownloadCompleteReceiver(applicationContext, downloadId, finalFileName, "application/pdf")
+
+            return // fonksiyondan çık
+        }
+
         // Permission check
         if (!checkStoragePermission()) {
             Log.e(TAG, "Storage permission not granted, can't download")
             showToastOnUiThread("İndirme için depolama izni gerekli")
             return
         }
-        
+
         // İndirme işlemini arkaplanda yap
         val finalUrl = url
         val finalFileName = fileName
         val finalUserAgent = userAgent
         val finalContentDisposition = contentDisposition
         val finalMimeTypeOuter = mimeType
-        
+
         executor.execute {
             try {
                 var context = contextRef.get()
@@ -228,33 +278,33 @@ class DownloadManager private constructor(context: Context) {
                     context = applicationContext
                     contextRef.set(context)
                 }
-                
+
                 val finalContext = context
-                
+
                 // Define variables for filename processing
                 var processedFileName = finalFileName
                 var fileNameModified = false
-                
+
                 val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
                 val request = android.app.DownloadManager.Request(Uri.parse(finalUrl))
-                
+
                 // İndirme performansı ayarları
                 request.setAllowedNetworkTypes(
-                    android.app.DownloadManager.Request.NETWORK_WIFI or 
-                    android.app.DownloadManager.Request.NETWORK_MOBILE
+                    android.app.DownloadManager.Request.NETWORK_WIFI or
+                            android.app.DownloadManager.Request.NETWORK_MOBILE
                 )
                 request.setAllowedOverMetered(true)  // Metered ağlarda indirmeye izin ver
                 request.setAllowedOverRoaming(true)  // Roaming'de indirmeye izin ver
-                
+
                 request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                
+
                 // Dosya adını doğru şekilde ayarla
                 var localFinalFileName: String
                 var localMimeType = finalMimeTypeOuter
-                
+
                 // İlk olarak Content-Disposition'dan dosya adını çıkarmaya çalış
                 val extractedName = extractFilenameFromContentDisposition(finalContentDisposition)
-                
+
                 if (!extractedName.isNullOrEmpty()) {
                     localFinalFileName = extractedName
                     Log.d(TAG, "Using filename from Content-Disposition: $localFinalFileName")
@@ -266,7 +316,7 @@ class DownloadManager private constructor(context: Context) {
                     localFinalFileName = URLUtil.guessFileName(finalUrl, finalContentDisposition, localMimeType)
                     Log.d(TAG, "Using URLUtil guessed filename: $localFinalFileName")
                 }
-                
+
                 // Handle MIME types correctly
                 if (localMimeType != null) {
                     if (localMimeType == "application/pdf" &&
@@ -277,7 +327,7 @@ class DownloadManager private constructor(context: Context) {
                         !(localFinalFileName.lowercase().endsWith(".jpg") || localFinalFileName.lowercase().endsWith(".jpeg"))) {
                         localFinalFileName = "$localFinalFileName.jpg"
                         Log.d(TAG, "Added .jpg extension to filename: $localFinalFileName")
-                        
+
                         // Normalize MIME type to image/jpeg
                         localMimeType = "image/jpeg"
                     } else if (localMimeType == "image/png" &&
@@ -286,20 +336,20 @@ class DownloadManager private constructor(context: Context) {
                         Log.d(TAG, "Added .png extension to filename: $localFinalFileName")
                     }
                 }
-                
+
                 // Try to improve the MIME type if it's not specific enough
                 if (localMimeType.isNullOrEmpty() || localMimeType == "application/octet-stream") {
                     val betterMimeType = determineBetterMimeType(finalUrl, localFinalFileName)
-                    
+
                     if (!betterMimeType.isNullOrEmpty()) {
                         localMimeType = betterMimeType
-                        
+
                         Log.d(TAG, "Improved MIME type to: $localMimeType")
                     }
                 }
-                
+
                 localFinalFileName = ensureCorrectFileExtension(localFinalFileName, localMimeType)
-                
+
                 // Force specific MIME types for common file extensions
                 if (localFinalFileName.lowercase().endsWith(".pdf")) {
                     localMimeType = "application/pdf"
@@ -308,41 +358,41 @@ class DownloadManager private constructor(context: Context) {
                 } else if (localFinalFileName.lowercase().endsWith(".png")) {
                     localMimeType = "image/png"
                 }
-                
+
                 Log.d(TAG, "Final filename for download: $localFinalFileName")
                 Log.d(TAG, "Final MIME type for download: $localMimeType")
-                
+
                 // Set filename for download
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, localFinalFileName)
                 } else {
                     request.setDestinationInExternalPublicDir(DOWNLOAD_DIRECTORY, localFinalFileName)
                 }
-                
+
                 // Set MIME type if available
                 if (!localMimeType.isNullOrEmpty()) {
                     // Convert "image/jpg" to "image/jpeg" for consistency
                     if (localMimeType == "image/jpg") {
                         localMimeType = "image/jpeg"
                     }
-                    
+
                     request.setMimeType(localMimeType)
                     Log.d(TAG, "Set download MIME type: $localMimeType")
                 }
-                
+
                 // Set user agent if available
                 if (!finalUserAgent.isNullOrEmpty()) {
                     request.addRequestHeader("User-Agent", finalUserAgent)
                     Log.d(TAG, "Set User-Agent: $finalUserAgent")
                 }
-                
+
                 // Get cookies for the URL
                 val cookies = CookieManager.getInstance().getCookie(finalUrl)
                 if (!cookies.isNullOrEmpty()) {
                     request.addRequestHeader("Cookie", cookies)
                     Log.d(TAG, "Added cookies to request")
                 }
-                
+
                 // If available, use provided Accept header
                 if (localMimeType?.startsWith("image/") == true) {
                     request.addRequestHeader("Accept", "image/*")
@@ -351,22 +401,22 @@ class DownloadManager private constructor(context: Context) {
                 } else {
                     request.addRequestHeader("Accept", "*/*")
                 }
-                
+
                 // Start download
                 val downloadId = downloadManager.enqueue(request)
                 Log.d(TAG, "Download enqueued with ID: $downloadId")
-                
+
                 // Keep track of active downloads
                 addActiveDownload(downloadId, localFinalFileName)
-                
+
                 val finalLocalMimeType = localMimeType
                 val finalLocalFileName = localFinalFileName
-                
+
                 // Show toast on UI thread
                 Handler(Looper.getMainLooper()).post {
                     showToast(finalContext.getString(R.string.download_started, finalLocalFileName))
                 }
-                
+
                 // Notify for media files
                 if (finalLocalMimeType?.startsWith("image/") == true) {
                     registerDownloadCompleteReceiver(
@@ -387,10 +437,10 @@ class DownloadManager private constructor(context: Context) {
                         finalLocalFileName, finalLocalMimeType
                     )
                 }
-                
+
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting download", e)
-                
+
                 // Show error on UI thread
                 Handler(Looper.getMainLooper()).post {
                     showToast("İndirme başlatılamadı: ${e.message}")
@@ -410,37 +460,37 @@ class DownloadManager private constructor(context: Context) {
         try {
             // Loglansın
             Log.d(TAG, "Parsing Content-Disposition: $contentDisposition")
-            
+
             // Önce standart "filename=" formatını ara
             val simplePattern = Pattern.compile(
-                "filename\\s*=\\s*['\"]?([^;\\r\\n\"']*)['\"]?", 
+                "filename\\s*=\\s*['\"]?([^;\\r\\n\"']*)['\"]?",
                 Pattern.CASE_INSENSITIVE
             )
             val simpleMatcher = simplePattern.matcher(contentDisposition)
-            
+
             if (simpleMatcher.find()) {
                 var fileName = simpleMatcher.group(1)?.trim() ?: ""
                 Log.d(TAG, "Found filename with simple pattern: $fileName")
-                
+
                 // Ekstra temizlik
                 fileName = fileName.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-                
+
                 if (fileName.isNotEmpty()) {
                     return fileName
                 }
             }
-            
+
             // UTF-8 kodlanmış filename* formatını ara
             val utfPattern = Pattern.compile(
-                "filename\\*\\s*=\\s*UTF-8''(.*?)(?:['\"]?$|\\s|;)", 
+                "filename\\*\\s*=\\s*UTF-8''(.*?)(?:['\"]?$|\\s|;)",
                 Pattern.CASE_INSENSITIVE
             )
             val utfMatcher = utfPattern.matcher(contentDisposition)
-            
+
             if (utfMatcher.find()) {
                 var fileName = utfMatcher.group(1)
                 Log.d(TAG, "Found filename with UTF-8 pattern: $fileName")
-                
+
                 // URL decode - Türkçe karakterler için daha kapsamlı dekodlama
                 try {
                     fileName = java.net.URLDecoder.decode(fileName, "UTF-8")
@@ -464,15 +514,15 @@ class DownloadManager private constructor(context: Context) {
                         .replace("%C3%B6", "ö")
                     Log.d(TAG, "Manual decoded filename: $fileName")
                 }
-                
+
                 // Tırnak işaretlerini temizle
                 if (fileName.startsWith("\"") && fileName.endsWith("\"")) {
                     fileName = fileName.substring(1, fileName.length - 1)
                 }
-                
+
                 // Dosya sistemi için güvenli karakter setine dönüştür
                 fileName = fileName.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-                
+
                 Log.d(TAG, "Final filename: $fileName")
                 return fileName
             }
@@ -561,7 +611,7 @@ class DownloadManager private constructor(context: Context) {
 
         return "application/octet-stream"
     }
-    
+
     /**
      * Dosya uzantısını alır
      */
@@ -571,7 +621,7 @@ class DownloadManager private constructor(context: Context) {
         }
         return fileName.substring(fileName.lastIndexOf(".") + 1).lowercase(Locale.ROOT)
     }
-    
+
     /**
      * Removes the file extension from a filename
      * @param fileName Filename with or without extension
@@ -593,13 +643,13 @@ class DownloadManager private constructor(context: Context) {
         // Önce dosya adına bakarak MIME type belirle
         if (fileName != null) {
             val lowerFileName = fileName.lowercase()
-            
+
             // SoilContinuity dosyaları için özel kontrol
             if (lowerFileName.contains("soilcontinuity")) {
                 Log.d(TAG, "Detected SoilContinuity file, setting MIME type to image/jpeg")
                 return "image/jpeg"
             }
-            
+
             // Diğer resim uzantıları
             if (lowerFileName.endsWith(".jpg") || lowerFileName.endsWith(".jpeg")) {
                 Log.d(TAG, "Using image/jpeg MIME type based on .jpg extension in filename")
@@ -612,36 +662,36 @@ class DownloadManager private constructor(context: Context) {
                 return "application/pdf"
             }
         }
-        
+
         // URL'ye bakarak MIME type belirle
         val lowerUrl = url?.lowercase() ?: ""
-        
+
         // SoilContinuity URL'leri için özel kontrol
         if (lowerUrl.contains("soilcontinuity")) {
             Log.d(TAG, "Detected SoilContinuity in URL, setting MIME type to image/jpeg")
             return "image/jpeg"
         }
-        
+
         // PDF file indicators
-        if (lowerUrl.contains(".pdf") || lowerUrl.contains("pdf=true") || 
+        if (lowerUrl.contains(".pdf") || lowerUrl.contains("pdf=true") ||
             lowerUrl.contains("format=pdf")) {
             return "application/pdf"
-        } 
+        }
         // Image file indicators
         else if (lowerUrl.contains(".jpg") || lowerUrl.contains(".jpeg") ||
-                 lowerUrl.contains("format=jpg") || lowerUrl.contains("format=jpeg")) {
+            lowerUrl.contains("format=jpg") || lowerUrl.contains("format=jpeg")) {
             return "image/jpeg"
-        } 
+        }
         else if (lowerUrl.contains(".png") || lowerUrl.contains("format=png")) {
             return "image/png"
-        } 
+        }
         else if (lowerUrl.contains(".gif") || lowerUrl.contains("format=gif")) {
             return "image/gif"
         }
         // Document format indicators
         else if (lowerUrl.contains(".doc")) {
             return "application/msword"
-        } 
+        }
         else if (lowerUrl.contains(".docx")) {
             return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         }
@@ -651,17 +701,17 @@ class DownloadManager private constructor(context: Context) {
         else if (lowerUrl.contains(".xlsx")) {
             return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         }
-        
+
         // Additional check for special URL patterns that often contain PDFs
-        if (lowerUrl.contains("/document/") || lowerUrl.contains("/viewdoc") || 
+        if (lowerUrl.contains("/document/") || lowerUrl.contains("/viewdoc") ||
             lowerUrl.contains("/download/") || lowerUrl.contains("/attachments/")) {
             return "application/pdf"
         }
-        
+
         // Default fallback
         return "application/octet-stream"
     }
-    
+
     /**
      * Dosya uzantısını MIME türüne göre düzenler
      */
@@ -697,7 +747,7 @@ class DownloadManager private constructor(context: Context) {
             // Remove the .bin extension first
             tempFileName = tempFileName.substring(0, tempFileName.length - 4)
             Log.d(TAG, "Removed .bin extension: $tempFileName")
-            
+
             // Check if the original file was supposed to be a JPG from the MIME type
             // This is the main fix for the jpg->bin conversion issue
             if (mimeType != null && (mimeType == "image/jpeg" || mimeType == "image/jpg")) {
@@ -706,7 +756,7 @@ class DownloadManager private constructor(context: Context) {
                 return tempFileName
             }
         }
-        
+
         val expectedExtension = mimeToExtMap[mimeType] ?: run {
             if (mimeType != null) {
                 val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
@@ -715,7 +765,7 @@ class DownloadManager private constructor(context: Context) {
                 } else null
             } else null
         }
-        
+
         // For image types, ensure proper extension
         val imageExtension = if (mimeType != null && mimeType.startsWith("image/")) {
             when (mimeType) {
@@ -736,7 +786,7 @@ class DownloadManager private constructor(context: Context) {
                 if (lastDotIndex > 0) {
                     tempFileName = tempFileName.substring(0, lastDotIndex)
                 }
-                
+
                 // Add the proper extension
                 tempFileName += finalExtension
                 Log.d(TAG, "Applied proper extension: $tempFileName")
@@ -745,7 +795,7 @@ class DownloadManager private constructor(context: Context) {
 
         return tempFileName
     }
-    
+
     /**
      * İndirme onay dialogu - güvenli context işleme ile
      */
@@ -758,6 +808,12 @@ class DownloadManager private constructor(context: Context) {
         sizeInfo: String?,
         isImage: Boolean
     ) {
+        // YENI EKLENEN: PdfForEK için direkt indirme
+        if (url.contains("/PdfForEK")) {
+            downloadFile(url, fileName, mimeType, userAgent, contentDisposition)
+            return
+        }
+
         // Get a valid activity context
         val dialogContext = getValidActivityContext()
         if (dialogContext == null) {
@@ -766,21 +822,21 @@ class DownloadManager private constructor(context: Context) {
             downloadFile(url, fileName, mimeType, userAgent, contentDisposition)
             return
         }
-        
+
         // UI thread üzerinde dialog göster
         val mainHandler = Handler(Looper.getMainLooper())
         mainHandler.post {
             try {
-                val title = if (isImage) 
-                    dialogContext.getString(R.string.download_image) 
-                else 
+                val title = if (isImage)
+                    dialogContext.getString(R.string.download_image)
+                else
                     dialogContext.getString(R.string.download_file)
-                
-                val message = if (sizeInfo != null) 
-                    "$fileName ($sizeInfo)" 
-                else 
+
+                val message = if (sizeInfo != null)
+                    "$fileName ($sizeInfo)"
+                else
                     fileName
-                
+
                 // Use standard AlertDialog since we have a valid Activity context
                 val builder = AlertDialog.Builder(dialogContext)
                 builder.setTitle(title)
@@ -796,7 +852,7 @@ class DownloadManager private constructor(context: Context) {
                     .setNegativeButton(dialogContext.getString(R.string.download_cancel)) { dialog, which ->
                         dialog.dismiss()
                     }
-                
+
                 // Görselse resmi göster
                 if (isImage) {
                     try {
@@ -806,22 +862,22 @@ class DownloadManager private constructor(context: Context) {
                             ViewGroup.LayoutParams.WRAP_CONTENT
                         )
                         imageView.adjustViewBounds = true
-                        
+
                         // Glide ile önizleme göster
                         Glide.with(dialogContext)
                             .load(url)
                             .centerCrop()
                             .into(imageView)
-                        
+
                         builder.setView(imageView)
                     } catch (e: Exception) {
                         Log.e(TAG, "Error setting image view", e)
                     }
                 }
-                
+
                 val dialog = builder.create()
                 dialog.show()
-                
+
             } catch (e: Exception) {
                 Log.e(TAG, "Error showing download dialog: ${e.message}")
                 // If dialog fails, just download directly
@@ -829,7 +885,7 @@ class DownloadManager private constructor(context: Context) {
             }
         }
     }
-    
+
     /**
      * Get a valid activity context for showing dialogs
      */
@@ -841,11 +897,11 @@ class DownloadManager private constructor(context: Context) {
                 return currentActivityContext
             }
         }
-        
+
         // No valid activity context available
         return null
     }
-    
+
     /**
      * Özel HTTP bağlantısı ile dosya indirme
      */
@@ -856,7 +912,7 @@ class DownloadManager private constructor(context: Context) {
             showToastOnUiThread("İndirme için depolama izni gerekli")
             return
         }
-        
+
         val userAgent = "Mozilla/5.0 (Linux; Android 10; Mobile)"
         val referer = ""
 
@@ -864,7 +920,7 @@ class DownloadManager private constructor(context: Context) {
             var connection: HttpURLConnection? = null
             var input: InputStream? = null
             var output: FileOutputStream? = null
-            
+
             // Define variables for filename processing
             var processedFileName = fileName
             var fileNameModified = false
@@ -926,14 +982,14 @@ class DownloadManager private constructor(context: Context) {
 
                 // Determine proper filename with correct extension
                 val finalFileName: String
-                
+
                 // First try to get filename from header
                 if (!fileNameFromHeader.isNullOrEmpty()) {
                     Log.d(TAG, "Using filename from Content-Disposition: $fileNameFromHeader")
-                    
+
                     // Special handling for JPG files in Content-Disposition
-                    finalFileName = if (contentDisposition?.lowercase()?.contains(".jpg") == true || 
-                                  contentDisposition?.lowercase()?.contains(".jpeg") == true) {
+                    finalFileName = if (contentDisposition?.lowercase()?.contains(".jpg") == true ||
+                        contentDisposition?.lowercase()?.contains(".jpeg") == true) {
                         var baseName = fileNameFromHeader
                         val dotIndex = baseName.lastIndexOf(".")
                         if (dotIndex > 0) {
@@ -949,26 +1005,26 @@ class DownloadManager private constructor(context: Context) {
                 else if (contentType?.contains("application/octet-stream") == true) {
                     // Try to determine a better MIME type based on URL and filename
                     val betterMimeType = determineBetterMimeType(url, fileName)
-                    val finalMimeType = if (betterMimeType != null && betterMimeType != "application/octet-stream") 
-                                        betterMimeType else contentType
-                    
+                    val finalMimeType = if (betterMimeType != null && betterMimeType != "application/octet-stream")
+                        betterMimeType else contentType
+
                     Log.d(TAG, "For octet-stream: detected better MIME type: $finalMimeType")
                     finalFileName = ensureProperFileExtension(fileName, finalMimeType, url)
                 }
                 // Special handling for PDFs (often misidentified)
-                else if ((contentType?.contains("application/pdf") == true) || 
-                         url.lowercase().contains(".pdf")) {
+                else if ((contentType?.contains("application/pdf") == true) ||
+                    url.lowercase().contains(".pdf")) {
                     finalFileName = "${removeExtension(fileName)}.pdf"
                     Log.d(TAG, "Using PDF filename: $finalFileName")
-                } 
+                }
                 // For images, ensure proper extension
                 else if (contentType?.contains("image/") == true) {
                     finalFileName = when {
-                        contentType.contains("jpeg") || contentType.contains("jpg") -> 
+                        contentType.contains("jpeg") || contentType.contains("jpg") ->
                             "${removeExtension(fileName)}.jpg"
-                        contentType.contains("png") -> 
+                        contentType.contains("png") ->
                             "${removeExtension(fileName)}.png"
-                        contentType.contains("gif") -> 
+                        contentType.contains("gif") ->
                             "${removeExtension(fileName)}.gif"
                         else -> {
                             // Other image types
@@ -982,7 +1038,7 @@ class DownloadManager private constructor(context: Context) {
                         }
                     }
                     Log.d(TAG, "Using image filename: $finalFileName")
-                } 
+                }
                 // For other content types, try to get extension from MIME type
                 else if (contentType != null) {
                     val extension = MimeTypeMap.getSingleton()
@@ -992,7 +1048,7 @@ class DownloadManager private constructor(context: Context) {
                     } else {
                         fileName
                     }
-                } 
+                }
                 // If all else fails, use the provided filename
                 else {
                     finalFileName = fileName
@@ -1002,13 +1058,13 @@ class DownloadManager private constructor(context: Context) {
                 var effectiveFileName = finalFileName
                 val mimeType = getMimeTypeFromFileName(effectiveFileName)
                 var isFileNameModified = false
-                
-                if (mimeType?.startsWith("image/") == true && 
-                    !(effectiveFileName.lowercase().endsWith(".jpg") || 
-                      effectiveFileName.lowercase().endsWith(".jpeg") || 
-                      effectiveFileName.lowercase().endsWith(".png") || 
-                      effectiveFileName.lowercase().endsWith(".gif"))) {
-                    
+
+                if (mimeType?.startsWith("image/") == true &&
+                    !(effectiveFileName.lowercase().endsWith(".jpg") ||
+                            effectiveFileName.lowercase().endsWith(".jpeg") ||
+                            effectiveFileName.lowercase().endsWith(".png") ||
+                            effectiveFileName.lowercase().endsWith(".gif"))) {
+
                     effectiveFileName = when (mimeType) {
                         "image/jpeg" -> {
                             isFileNameModified = true
@@ -1024,12 +1080,12 @@ class DownloadManager private constructor(context: Context) {
                         }
                         else -> effectiveFileName
                     }
-                    
+
                     if (isFileNameModified) {
                         Log.d(TAG, "Fixed image filename extension: $effectiveFileName")
                     }
                 }
-                
+
                 Log.d(TAG, "Final file name with extension: $finalFileName")
 
                 // Handle different storage access methods based on Android version
@@ -1039,34 +1095,34 @@ class DownloadManager private constructor(context: Context) {
                     try {
                         val values = ContentValues()
                         values.put(MediaStore.Downloads.DISPLAY_NAME, finalEffectiveFileName)
-                        
+
                         // Get precise mime type from filename
                         val usedMimeType = getMimeTypeFromFileName(finalEffectiveFileName)
                         Log.d(TAG, "MIME type for MediaStore: $usedMimeType")
                         values.put(MediaStore.Downloads.MIME_TYPE, usedMimeType)
-                        
+
                         // Choose the right collection based on mime type
                         val collectionUri: Uri
                         if (usedMimeType?.startsWith("image/") == true) {
                             Log.d(TAG, "Using MediaStore Images collection")
-                            values.put(MediaStore.Images.Media.RELATIVE_PATH, 
+                            values.put(MediaStore.Images.Media.RELATIVE_PATH,
                                 "${Environment.DIRECTORY_PICTURES}/$DOWNLOAD_DIRECTORY")
                             collectionUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                         } else {
                             Log.d(TAG, "Using MediaStore Downloads collection")
-                            values.put(MediaStore.Downloads.RELATIVE_PATH, 
+                            values.put(MediaStore.Downloads.RELATIVE_PATH,
                                 "${Environment.DIRECTORY_DOWNLOADS}/$DOWNLOAD_DIRECTORY")
                             collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI
                         }
-                        
+
                         val uri = applicationContext.contentResolver.insert(
                             collectionUri, values)
-                        
+
                         if (uri != null) {
                             Log.d(TAG, "MediaStore URI created: $uri")
                             input = connection.inputStream
                             val mediaStoreOutput = applicationContext.contentResolver.openOutputStream(uri)
-                            
+
                             if (mediaStoreOutput != null) {
                                 val buffer = ByteArray(8192)
                                 var bytesRead: Int
@@ -1076,13 +1132,13 @@ class DownloadManager private constructor(context: Context) {
                                     mediaStoreOutput.write(buffer, 0, bytesRead)
                                     totalBytesRead += bytesRead
                                 }
-                                
+
                                 // Ensure output is properly flushed and closed
                                 mediaStoreOutput.flush()
                                 mediaStoreOutput.close()
-                                
+
                                 Log.d(TAG, "Download completed using MediaStore. Total bytes: $totalBytesRead")
-                                
+
                                 // Offer to open the file
                                 val mainHandler = Handler(Looper.getMainLooper())
                                 val finalUri = uri
@@ -1090,7 +1146,7 @@ class DownloadManager private constructor(context: Context) {
                                 mainHandler.post {
                                     offerToOpenFile(finalUri.toString(), finalMimeType)
                                 }
-                                
+
                                 return@Thread
                             } else {
                                 Log.e(TAG, "Failed to open MediaStore output stream")
@@ -1103,19 +1159,19 @@ class DownloadManager private constructor(context: Context) {
                         // Fall back to legacy method if MediaStore fails
                     }
                 }
-                
+
                 // Legacy method for older Android versions or as fallback
                 val downloadsDir: File
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     // For Android 10+ use app-specific directory as fallback
-                    downloadsDir = File(applicationContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), 
+                    downloadsDir = File(applicationContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
                         DOWNLOAD_DIRECTORY)
                 } else {
                     // For older versions, use public directory
                     downloadsDir = File(Environment.getExternalStoragePublicDirectory(
                         Environment.DIRECTORY_DOWNLOADS), DOWNLOAD_DIRECTORY)
                 }
-                
+
                 if (!downloadsDir.exists()) {
                     val dirCreated = downloadsDir.mkdirs()
                     if (!dirCreated) {
@@ -1144,11 +1200,11 @@ class DownloadManager private constructor(context: Context) {
                 // Process the downloaded file
                 // Check for the right MIME type and file extension based on content type
                 val finalMimeType: String
-                
+
                 // Use a conditional check for JPEG files instead of redeclaring variables
                 finalMimeType = when {
                     finalFileName.lowercase().endsWith(".jpg") ||
-                    finalFileName.lowercase().endsWith(".jpeg") -> {
+                            finalFileName.lowercase().endsWith(".jpeg") -> {
                         "image/jpeg"
                     }
                     finalFileName.lowercase().endsWith(".png") -> {
@@ -1161,7 +1217,7 @@ class DownloadManager private constructor(context: Context) {
                         "application/pdf"
                     }
                     contentType != null &&
-                    contentType != "application/octet-stream" -> {
+                            contentType != "application/octet-stream" -> {
                         contentType
                     }
                     else -> {
@@ -1199,7 +1255,7 @@ class DownloadManager private constructor(context: Context) {
             }
         }.start()
     }
-    
+
     /**
      * MediaScanner'a yeni dosyayı bildirir
      */
@@ -1209,14 +1265,14 @@ class DownloadManager private constructor(context: Context) {
                 applicationContext,
                 arrayOf(file.absolutePath),
                 arrayOf(mimeType)
-            ) { path, uri -> 
+            ) { path, uri ->
                 Log.d(TAG, "Media scan completed: $uri")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error notifying media scanner", e)
         }
     }
-    
+
     /**
      * İndirme tamamlandığında bildirim göstermek için alıcı kaydeder
      * ve dosyayı açma seçeneği sunar
@@ -1230,11 +1286,11 @@ class DownloadManager private constructor(context: Context) {
                         // Get the downloaded file's URI
                         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
                         val fileUri = dm.getUriForDownloadedFile(downloadId)
-                        
+
                         if (fileUri != null) {
                             // Log the successful download
                             Log.d(TAG, "Download completed, URI: $fileUri, MIME: $mimeType")
-                            
+
                             // Offer to open the file on the UI thread
                             Handler(Looper.getMainLooper()).post {
                                 offerToOpenFile(fileUri.toString(), mimeType)
@@ -1242,8 +1298,8 @@ class DownloadManager private constructor(context: Context) {
                         } else {
                             // If URI is null, just show a toast
                             Toast.makeText(
-                                context, 
-                                context.getString(R.string.download_completed, fileName), 
+                                context,
+                                context.getString(R.string.download_completed, fileName),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -1251,8 +1307,8 @@ class DownloadManager private constructor(context: Context) {
                         Log.e(TAG, "Error handling download completion", e)
                         // Show a simple toast on error
                         Toast.makeText(
-                            context, 
-                            context.getString(R.string.download_completed, fileName), 
+                            context,
+                            context.getString(R.string.download_completed, fileName),
                             Toast.LENGTH_SHORT
                         ).show()
                     } finally {
@@ -1266,7 +1322,7 @@ class DownloadManager private constructor(context: Context) {
                 }
             }
         }
-        
+
         // İndirme tamamlandığında bildirimi almak için filtre
         val filter = IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE)
         // Specify RECEIVER_NOT_EXPORTED flag for Android 13+ (API 33+)
@@ -1301,7 +1357,7 @@ class DownloadManager private constructor(context: Context) {
                     applicationContext,
                     "${applicationContext.packageName}.fileprovider",
                     file
-                ).also { 
+                ).also {
                     openFileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
             } else {
@@ -1341,10 +1397,10 @@ class DownloadManager private constructor(context: Context) {
             Log.e(TAG, "Error showing notification", e)
         }
     }
-    
+
     /**
      * Ensures that a filename has the proper extension based on content type and URL
-     * 
+     *
      * @param fileName The original filename
      * @param contentType The content type from the HTTP response
      * @param url The URL being downloaded
@@ -1357,49 +1413,49 @@ class DownloadManager private constructor(context: Context) {
         } else {
             fileName
         }
-        
+
         // Helper to remove existing extension
         val dotIndex = baseName.lastIndexOf(".")
         if (dotIndex > 0) {
             baseName = baseName.substring(0, dotIndex)
         }
-        
+
         // Handle .bin extensions - always replace them
         if (fileName?.lowercase()?.endsWith(".bin") == true) {
             Log.d(TAG, "Removed .bin extension: $baseName")
         }
-        
+
         // Check for PDF files (often misidentified)
-        if ((contentType?.contains("application/pdf") == true) || 
+        if ((contentType?.contains("application/pdf") == true) ||
             url.lowercase().contains(".pdf")) {
             return "$baseName.pdf"
         }
-        
+
         // Check for binary content but with clues in the URL
         if (contentType?.contains("application/octet-stream") == true) {
             // Look for extension clues in the URL
             return when {
-                url.lowercase().contains(".jpg") || url.lowercase().contains(".jpeg") -> 
+                url.lowercase().contains(".jpg") || url.lowercase().contains(".jpeg") ->
                     "$baseName.jpg"
-                url.lowercase().contains(".png") -> 
+                url.lowercase().contains(".png") ->
                     "$baseName.png"
-                url.lowercase().contains(".pdf") -> 
+                url.lowercase().contains(".pdf") ->
                     "$baseName.pdf"
-                else -> 
+                else ->
                     baseName
             }
         }
-        
+
         // Handle image types specifically
         if (contentType != null) {
             return when {
-                contentType.contains("image/jpeg") || contentType.contains("image/jpg") -> 
+                contentType.contains("image/jpeg") || contentType.contains("image/jpg") ->
                     "$baseName.jpg"
-                contentType.contains("image/png") -> 
+                contentType.contains("image/png") ->
                     "$baseName.png"
-                contentType.contains("image/gif") -> 
+                contentType.contains("image/gif") ->
                     "$baseName.gif"
-                contentType.contains("application/pdf") -> 
+                contentType.contains("application/pdf") ->
                     "$baseName.pdf"
                 else -> {
                     // Try to get extension from MIME type
@@ -1412,7 +1468,7 @@ class DownloadManager private constructor(context: Context) {
                 }
             }
         }
-        
+
         // If we couldn't determine a better extension, keep the original filename
         // but make sure it's not .bin
         return if (fileName?.lowercase()?.endsWith(".bin") == true) {
@@ -1429,52 +1485,52 @@ class DownloadManager private constructor(context: Context) {
         if (fileName == null) {
             return null
         }
-        
+
         // Normalize to lowercase for comparison
         val lowerFileName = fileName.lowercase()
-        
+
         // Image formats
         return when {
-            lowerFileName.endsWith(".jpg") || lowerFileName.endsWith(".jpeg") -> 
+            lowerFileName.endsWith(".jpg") || lowerFileName.endsWith(".jpeg") ->
                 "image/jpeg"
-            lowerFileName.endsWith(".png") -> 
+            lowerFileName.endsWith(".png") ->
                 "image/png"
-            lowerFileName.endsWith(".gif") -> 
+            lowerFileName.endsWith(".gif") ->
                 "image/gif"
-            lowerFileName.endsWith(".webp") -> 
+            lowerFileName.endsWith(".webp") ->
                 "image/webp"
-            lowerFileName.endsWith(".bmp") -> 
+            lowerFileName.endsWith(".bmp") ->
                 "image/bmp"
             // Document formats
-            lowerFileName.endsWith(".pdf") -> 
+            lowerFileName.endsWith(".pdf") ->
                 "application/pdf"
-            lowerFileName.endsWith(".doc") -> 
+            lowerFileName.endsWith(".doc") ->
                 "application/msword"
-            lowerFileName.endsWith(".docx") -> 
+            lowerFileName.endsWith(".docx") ->
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            lowerFileName.endsWith(".xls") -> 
+            lowerFileName.endsWith(".xls") ->
                 "application/vnd.ms-excel"
-            lowerFileName.endsWith(".xlsx") -> 
+            lowerFileName.endsWith(".xlsx") ->
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            lowerFileName.endsWith(".ppt") -> 
+            lowerFileName.endsWith(".ppt") ->
                 "application/vnd.ms-powerpoint"
-            lowerFileName.endsWith(".pptx") -> 
+            lowerFileName.endsWith(".pptx") ->
                 "application/vnd.openxmlformats-officedocument.presentationml.presentation"
             // Text and other common formats
-            lowerFileName.endsWith(".txt") -> 
+            lowerFileName.endsWith(".txt") ->
                 "text/plain"
-            lowerFileName.endsWith(".html") || lowerFileName.endsWith(".htm") -> 
+            lowerFileName.endsWith(".html") || lowerFileName.endsWith(".htm") ->
                 "text/html"
-            lowerFileName.endsWith(".css") -> 
+            lowerFileName.endsWith(".css") ->
                 "text/css"
-            lowerFileName.endsWith(".js") -> 
+            lowerFileName.endsWith(".js") ->
                 "application/javascript"
             // Archive formats
-            lowerFileName.endsWith(".zip") -> 
+            lowerFileName.endsWith(".zip") ->
                 "application/zip"
-            lowerFileName.endsWith(".rar") -> 
+            lowerFileName.endsWith(".rar") ->
                 "application/x-rar-compressed"
-            lowerFileName.endsWith(".7z") -> 
+            lowerFileName.endsWith(".7z") ->
                 "application/x-7z-compressed"
             // Try to use the extension lookup as fallback
             else -> {
@@ -1489,7 +1545,7 @@ class DownloadManager private constructor(context: Context) {
                             return mimeType
                         }
                     }
-                    
+
                     // Then try using the URL method
                     val extension = MimeTypeMap.getFileExtensionFromUrl(fileName)
                     if (extension != null) {
@@ -1501,13 +1557,13 @@ class DownloadManager private constructor(context: Context) {
                 } catch (e: Exception) {
                     Log.e(TAG, "Error determining MIME type from filename: $fileName", e)
                 }
-                
+
                 // Default fallback
                 "application/octet-stream"
             }
         }
     }
-    
+
     /**
      * İndirme tamamlandığında dosyayı açmayı teklif eder
      */
@@ -1515,16 +1571,16 @@ class DownloadManager private constructor(context: Context) {
         if (uriString == null) {
             return
         }
-        
+
         Log.d(TAG, "Offering to open file - URI: $uriString")
         Log.d(TAG, "File MIME type: $mimeType")
-        
+
         try {
             val uri = Uri.parse(uriString)
-            
+
             // Get file name from URI
             val fileName = uri.lastPathSegment ?: "İndirilen dosya"
-            
+
             // Get valid activity context
             val dialogContext = getValidActivityContext()
             if (dialogContext != null) {
@@ -1540,8 +1596,8 @@ class DownloadManager private constructor(context: Context) {
             } else {
                 // If no valid context, just show toast
                 Toast.makeText(
-                    applicationContext, 
-                    applicationContext.getString(R.string.download_completed, fileName), 
+                    applicationContext,
+                    applicationContext.getString(R.string.download_completed, fileName),
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -1549,20 +1605,20 @@ class DownloadManager private constructor(context: Context) {
             Log.e(TAG, "Error offering to open downloaded file", e)
             // Show toast on error
             Toast.makeText(
-                applicationContext, 
-                applicationContext.getString(R.string.download_completed_generic), 
+                applicationContext,
+                applicationContext.getString(R.string.download_completed_generic),
                 Toast.LENGTH_SHORT
             ).show()
         }
     }
-    
+
     /**
      * Actually open the file with the proper intent
      */
     private fun openFile(uri: Uri, mimeType: String?) {
         Log.d(TAG, "Opening file - URI: $uri")
         Log.d(TAG, "Opening with MIME type: $mimeType")
-        
+
         // Fix MIME type if needed
         var finalMimeType = mimeType
         if (finalMimeType.isNullOrEmpty() || finalMimeType == "application/octet-stream") {
@@ -1582,39 +1638,39 @@ class DownloadManager private constructor(context: Context) {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            
+
             if (intent.resolveActivity(applicationContext.packageManager) != null) {
                 applicationContext.startActivity(intent)
             } else {
                 // No app found to open this file type
                 Toast.makeText(
-                    applicationContext, 
-                    R.string.download_no_app_to_open, 
+                    applicationContext,
+                    R.string.download_no_app_to_open,
                     Toast.LENGTH_SHORT
                 ).show()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error opening file: ${e.message}")
             Toast.makeText(
-                applicationContext, 
-                R.string.download_open_error, 
+                applicationContext,
+                R.string.download_open_error,
                 Toast.LENGTH_SHORT
             ).show()
         }
     }
-    
+
     // Yardımcı metotlar
     private fun showToast(message: String) {
         Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
     }
-    
+
     private fun showToastOnUiThread(message: String) {
         val mainHandler = Handler(Looper.getMainLooper())
         mainHandler.post {
             Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
         }
     }
-    
+
     /**
      * Check storage permissions and request if needed
      * @return true if permissions are already granted
@@ -1624,13 +1680,13 @@ class DownloadManager private constructor(context: Context) {
             Log.e(TAG, "No valid activity context to request permissions")
             return false
         }
-        
+
         // Android 13+ (API 33+) uses more granular permissions
         if (android.os.Build.VERSION.SDK_INT >= 33) { // Android.os.Build.VERSION_CODES.TIRAMISU
             if (androidx.core.content.ContextCompat.checkSelfPermission(
-                    currentActivityContext, 
-                    android.Manifest.permission.READ_MEDIA_IMAGES) == 
-                    android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    currentActivityContext,
+                    android.Manifest.permission.READ_MEDIA_IMAGES) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 return true
             } else {
                 androidx.core.app.ActivityCompat.requestPermissions(
@@ -1638,18 +1694,18 @@ class DownloadManager private constructor(context: Context) {
                     arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 100)
                 return false
             }
-        } 
+        }
         // Android 10+ (API 29+) with scoped storage
         else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             // With scoped storage, we can use MediaStore or app-specific directories without permission
             return true
-        } 
+        }
         // Android 6.0-9.0 (API 23-28) need runtime permissions
         else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             if (androidx.core.content.ContextCompat.checkSelfPermission(
-                    currentActivityContext, 
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == 
-                    android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    currentActivityContext,
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED) {
                 return true
             } else {
                 androidx.core.app.ActivityCompat.requestPermissions(
@@ -1657,7 +1713,7 @@ class DownloadManager private constructor(context: Context) {
                     arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 100)
                 return false
             }
-        } 
+        }
         // Android 5.1 and below (API 22-) - permissions granted at install time
         else {
             return true
@@ -1693,7 +1749,7 @@ class DownloadManager private constructor(context: Context) {
     /**
      * Create MediaStore content URI for inserting a file into shared storage
      * Used for Android 10+ (API 29+)
-     * 
+     *
      * @param context Context for ContentResolver
      * @param collection The MediaStore collection URI (Images, Video, etc.)
      * @param fileName The desired filename
@@ -1705,20 +1761,20 @@ class DownloadManager private constructor(context: Context) {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                
+
                 // For Android 10+
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     // Store in the Downloads directory
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + 
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS +
                             File.separator + DOWNLOAD_DIRECTORY)
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
             }
-            
+
             // Insert the URI
             val resolver = context.contentResolver
             val uri = resolver.insert(collection, values) ?: return null
-            
+
             // Mark as not pending if on Android 10+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 val updateValues = ContentValues().apply {
@@ -1726,7 +1782,7 @@ class DownloadManager private constructor(context: Context) {
                 }
                 resolver.update(uri, updateValues, null, null)
             }
-            
+
             return uri
         } catch (e: Exception) {
             Log.e(TAG, "Error creating MediaStore file", e)

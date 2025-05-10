@@ -1,6 +1,7 @@
 package com.asforce.asforcebrowser.download
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
@@ -20,15 +21,36 @@ class WebViewDownloadHelper(context: Context) {
         private const val TAG = "WebViewDownloadHelper"
         private const val DEBUG = false // Turn off for production
 
-        // JavaScript template for download button handler
+        // JavaScript template for download button handler - GÜNCELLENMIŞ
         private const val DOWNLOAD_BUTTON_HANDLER_JS = """
             (function() {
                 console.log('Injecting download button handler');
-                var downloadLinks = document.querySelectorAll('a[title="İndir"], a.btn-success, a:contains("İndir"), button:contains("İndir")');
+                
+                // Rapor butonlarını da yakalamak için
+                var downloadLinks = document.querySelectorAll(
+                    'a[title="İndir"], a.btn-success, a:contains("İndir"), button:contains("İndir"),' +
+                    'a[title="Rapor"], a.btn-danger[href*="PdfForEK"], a[href*="PdfForEK"]'
+                );
+                
                 console.log('Found download buttons: ' + downloadLinks.length);
+                
                 for (var i = 0; i < downloadLinks.length; i++) {
                     var link = downloadLinks[i];
-                    if (!link.hasAttribute('data-download-handled')) {
+                    
+                    // Rapor linklerini özel olarak işle
+                    if (link.href && link.href.includes('PdfForEK')) {
+                        if (!link.hasAttribute('data-download-handled')) {
+                            link.setAttribute('data-download-handled', 'true');
+                            link.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                console.log('Rapor indirme URL\'si yakalandı: ' + this.href);
+                                window.NativeDownloader.handleDownloadUrl(this.href);
+                                return false;
+                            });
+                        }
+                    }
+                    // Diğer linkler için eski işleme
+                    else if (!link.hasAttribute('data-download-handled')) {
                         link.setAttribute('data-download-handled', 'true');
                         var originalOnClick = link.onclick;
                         link.onclick = function(e) {
@@ -48,16 +70,12 @@ class WebViewDownloadHelper(context: Context) {
         """
     }
 
-    private val downloadManager: DownloadManager
+    private val downloadManager: DownloadManager = DownloadManager.getInstance(context)
     private val context: Context = context.applicationContext
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // Cache for processed URLs to avoid duplicate processing
     private val processedUrls = ConcurrentHashMap<String, Boolean>()
-
-    init {
-        this.downloadManager = DownloadManager.getInstance(context)
-    }
 
     /**
      * Sets up WebView downloads with optimized event handling.
@@ -83,7 +101,7 @@ class WebViewDownloadHelper(context: Context) {
         contentDisposition: String?,
         mimeType: String?,
         contentLength: Long
-    ) = withContext(Dispatchers.Default) {
+    ) {
         if (DEBUG) {
             Log.d(TAG, "Download initiated - URL: $url")
             Log.d(TAG, "Content-Disposition: $contentDisposition")
@@ -91,10 +109,7 @@ class WebViewDownloadHelper(context: Context) {
         }
 
         var fileName = extractBestFileName(url, contentDisposition)
-        var finalMimeType = mimeType
-
-        // Special handling for SoilContinuity and known file types
-        finalMimeType = improveMimeType(url, fileName, mimeType)
+        val finalMimeType: String = improveMimeType(url, fileName, mimeType ?: "application/octet-stream")
         fileName = ensureProperExtension(fileName, finalMimeType)
 
         if (DEBUG) {
@@ -102,17 +117,25 @@ class WebViewDownloadHelper(context: Context) {
             Log.d(TAG, "Final MIME type: $finalMimeType")
         }
 
+        // YENI EKLENEN: PdfForEK için direk indirme
+        if (url.contains("/PdfForEK")) {
+            withContext(Dispatchers.Main) {
+                downloadManager.downloadFile(url, fileName, finalMimeType, userAgent, contentDisposition)
+            }
+            return
+        }
+
         // Check if large file for direct download
         if (contentLength > 10 * 1024 * 1024) { // 10MB+
             withContext(Dispatchers.Main) {
                 downloadManager.downloadFile(url, fileName, finalMimeType, userAgent, contentDisposition)
             }
-            return@withContext
+            return
         }
 
         // Format size info
         val sizeInfo = formatFileSize(contentLength)
-        val isImage = finalMimeType?.startsWith("image/") == true
+        val isImage = finalMimeType.startsWith("image/")
 
         // Show download confirmation dialog
         withContext(Dispatchers.Main) {
@@ -140,7 +163,7 @@ class WebViewDownloadHelper(context: Context) {
         return fileName ?: "download"
     }
 
-    private fun improveMimeType(url: String, fileName: String?, mimeType: String?): String {
+    private fun improveMimeType(url: String, fileName: String?, mimeType: String): String {
         // Special handling for SoilContinuity
         if (url.contains("SoilContinuity", ignoreCase = true) ||
             fileName?.contains("SoilContinuity", ignoreCase = true) == true) {
@@ -148,12 +171,12 @@ class WebViewDownloadHelper(context: Context) {
         }
 
         // Fix generic MIME types
-        if (mimeType.isNullOrEmpty() || mimeType == "application/octet-stream") {
+        if (mimeType.isEmpty() || mimeType == "application/octet-stream") {
             return when {
                 url.contains(".pdf", ignoreCase = true) -> "application/pdf"
                 url.contains(".jpg", ignoreCase = true) || url.contains(".jpeg", ignoreCase = true) -> "image/jpeg"
                 url.contains(".png", ignoreCase = true) -> "image/png"
-                else -> mimeType ?: "application/octet-stream"
+                else -> mimeType
             }
         }
 
@@ -250,13 +273,21 @@ class WebViewDownloadHelper(context: Context) {
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
-                originalClient?.onPageFinished(view, url)
+                originalClient.onPageFinished(view, url)
                 // Inject JavaScript after page load
                 injectDownloadButtonHandler(view)
             }
 
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                return handleUrlLoading(view, url, originalClient)
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val url = request.url.toString()
+                return if (isDownloadUrl(url)) {
+                    coroutineScope.launch {
+                        handleSpecialDownloadUrl(url)
+                    }
+                    true
+                } else {
+                    originalClient.shouldOverrideUrlLoading(view, request)
+                }
             }
 
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -269,39 +300,28 @@ class WebViewDownloadHelper(context: Context) {
                     }
                 }
 
-                return originalClient?.shouldInterceptRequest(view, request)
+                return originalClient.shouldInterceptRequest(view, request)
                     ?: super.shouldInterceptRequest(view, request)
             }
         }
     }
 
-    private fun handleUrlLoading(view: WebView, url: String, originalClient: WebViewClient?): Boolean {
-        if (DEBUG) Log.d(TAG, "shouldOverrideUrlLoading: $url")
-
-        if (isDownloadUrl(url)) {
-            coroutineScope.launch {
-                handleSpecialDownloadUrl(url)
-            }
-            return true
-        }
-
-        return originalClient?.shouldOverrideUrlLoading(view, url) ?: false
-    }
-
     /**
-     * Checks if URL is a download URL
+     * Checks if URL is a download URL - GÜNCELLENMIŞ
      */
     private fun isDownloadUrl(url: String?): Boolean {
         if (url == null) return false
         return url.contains("/EXT/PKControl/DownloadFile") ||
                 url.contains("/DownloadFile") ||
+                url.contains("/PdfForEK") ||  // YENİ EKLEME
+                url.contains("/EXT/PKControl/PdfForEK") ||  // YENİ EKLEME
                 (url.contains("download") && url.contains("id="))
     }
 
     /**
-     * Handles special download URLs with improved async processing
+     * Handles special download URLs with improved async processing - GÜNCELLENMIŞ
      */
-    private suspend fun handleSpecialDownloadUrl(url: String) = withContext(Dispatchers.Default) {
+    private suspend fun handleSpecialDownloadUrl(url: String) {
         if (DEBUG) Log.d(TAG, "Handling special download URL: $url")
 
         try {
@@ -309,6 +329,11 @@ class WebViewDownloadHelper(context: Context) {
 
             withContext(Dispatchers.Main) {
                 when {
+                    // YENİ EKLENEN: PdfForEK için özel işleme
+                    url.contains("/PdfForEK") -> {
+                        // Rapor dosyalarını hemen indirmeye başla
+                        downloadManager.downloadFile(url, fileName, mimeType, "Mozilla/5.0", null)
+                    }
                     isImage && fileName.contains("SoilContinuity", ignoreCase = true) -> {
                         val imageDownloader = ImageDownloader(context)
                         imageDownloader.downloadImage(url, null)
@@ -337,10 +362,22 @@ class WebViewDownloadHelper(context: Context) {
         val uri = android.net.Uri.parse(url)
         val type = uri.getQueryParameter("type")
         val id = uri.getQueryParameter("id")
+        val customerId = uri.getQueryParameter("customerId")
         val format = uri.getQueryParameter("format")
         var fileName = "download_${System.currentTimeMillis()}"
         var mimeType: String? = null
         var isImage = false
+
+        // YENİ EKLENEN: PdfForEK için özel işleme
+        if (url.contains("/PdfForEK")) {
+            mimeType = "application/pdf"
+            fileName = when {
+                customerId != null && type != null -> "Rapor_${customerId}_${type}_${System.currentTimeMillis()}.pdf"
+                customerId != null -> "Rapor_${customerId}_${System.currentTimeMillis()}.pdf"
+                else -> "Rapor_${System.currentTimeMillis()}.pdf"
+            }
+            return@withContext Triple(fileName, mimeType, false)
+        }
 
         // Special handling for SoilContinuity
         if (url.contains("SoilContinuity", ignoreCase = true)) {

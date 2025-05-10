@@ -33,7 +33,7 @@ object DownloadUrlHelper {
         Pattern.compile("filename=['\"]?([^;\\r\\n\"']*)['\"]?", Pattern.CASE_INSENSITIVE)
     }
 
-    // Common download URL patterns
+    // Common download URL patterns - GÜNCELLENMIŞ (Rapor URL'leri eklendi)
     private val downloadUrlPatterns = listOf(
         "/EXT/PKControl/DownloadFile",
         "/DownloadFile",
@@ -41,12 +41,15 @@ object DownloadUrlHelper {
         "/filedownload",
         "/file_download",
         "/getfile",
-        "/get_file"
+        "/get_file",
+        "/EXT/PKControl/PdfForEK",  // Yeni eklenen rapor URL'si
+        "/PdfForEK"                 // Yeni eklenen rapor URL'si kısayolu
     )
 
     /**
      * Checks if a URL is a download URL using caching.
      */
+    @JvmStatic
     fun isDownloadUrl(url: String?): Boolean {
         if (url.isNullOrEmpty()) return false
 
@@ -69,6 +72,9 @@ object DownloadUrlHelper {
         // Check for download with id parameter
         if (lowerUrl.contains("download") && lowerUrl.contains("id=")) return true
 
+        // YENI EKLENEN: PdfForEK için özel kontrol
+        if (lowerUrl.contains("/pdfforek") && lowerUrl.contains("customerid=")) return true
+
         // Check file extension pattern
         if (fileExtensionPattern.matcher(url).matches()) return true
 
@@ -78,13 +84,14 @@ object DownloadUrlHelper {
     /**
      * Gets the file name from a URL with improved caching.
      */
+    @JvmStatic
     fun getFileNameFromUrl(url: String?): String? {
         if (url.isNullOrEmpty()) return null
 
         // Check cache first
         fileNameCache[url]?.let { return it }
 
-        var fileName = extractFileName(url)
+        val fileName = extractFileName(url)
 
         // Cache the result
         fileNameCache[url] = fileName
@@ -94,6 +101,18 @@ object DownloadUrlHelper {
     private fun extractFileName(url: String): String? {
         try {
             val uri = Uri.parse(url)
+
+            // YENI EKLENEN: PdfForEK için özel işleme
+            if (url.contains("/PdfForEK")) {
+                val customerId = uri.getQueryParameter("customerId")
+                val type = uri.getQueryParameter("type")
+                val fileName = when {
+                    customerId != null && type != null -> "Rapor_${customerId}_${type}_${System.currentTimeMillis()}.pdf"
+                    customerId != null -> "Rapor_${customerId}_${System.currentTimeMillis()}.pdf"
+                    else -> "Rapor_${System.currentTimeMillis()}.pdf"
+                }
+                return fileName
+            }
 
             // Try to extract file name from query parameters
             var fileName = extractFileNameFromParams(uri)
@@ -148,6 +167,7 @@ object DownloadUrlHelper {
     /**
      * Gets the MIME type from a URL with caching.
      */
+    @JvmStatic
     fun getMimeTypeFromUrl(url: String?): String? {
         if (url.isNullOrEmpty()) return null
 
@@ -204,7 +224,7 @@ object DownloadUrlHelper {
         return checkUrlPatternsForMimeType(lowerUrl)
     }
 
-    private fun checkUrlPatternsForMimeType(lowerUrl: String): String? {
+    private fun checkUrlPatternsForMimeType(lowerUrl: String): String {
         val patternToMimeMap = mapOf(
             "pdf=true" to "application/pdf",
             "format=pdf" to "application/pdf",
@@ -226,6 +246,7 @@ object DownloadUrlHelper {
     /**
      * Extracts file name from content disposition header with improved regex.
      */
+    @JvmStatic
     fun extractFileNameFromContentDisposition(contentDisposition: String?): String? {
         if (contentDisposition.isNullOrEmpty()) return null
 
@@ -269,8 +290,6 @@ object DownloadUrlHelper {
         return processed.ifEmpty { null }
     }
 
-// Problemi çözen kod bloğu:
-
     private fun decodeUrlEncodedString(input: String): String {
         var decoded = input
 
@@ -308,6 +327,7 @@ object DownloadUrlHelper {
     /**
      * Clears all caches to free memory
      */
+    @JvmStatic
     fun clearCaches() {
         downloadPatternCache.clear()
         mimeTypeCache.clear()
