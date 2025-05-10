@@ -20,6 +20,7 @@ import com.asforce.asforcebrowser.util.performance.PageLoadOptimizer
 import com.asforce.asforcebrowser.util.performance.PerformanceOptimizer
 import com.asforce.asforcebrowser.util.performance.ScrollOptimizer
 import com.asforce.asforcebrowser.util.performance.menu.MenuOptimizer
+import com.asforce.asforcebrowser.download.WebViewDownloadHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -45,6 +46,7 @@ class WebViewFragment : Fragment() {
     private lateinit var mediaOptimizer: MediaOptimizer
     private lateinit var pageLoadOptimizer: PageLoadOptimizer
     private lateinit var menuOptimizer: MenuOptimizer
+    private lateinit var webViewDownloadHelper: WebViewDownloadHelper
 
     // WebViewClient - Sayfa yükleme ve URL değişimleri için
     private val webViewClient = object : WebViewClient() {
@@ -161,6 +163,7 @@ class WebViewFragment : Fragment() {
             mediaOptimizer = MediaOptimizer(ctx)
             pageLoadOptimizer = PageLoadOptimizer(ctx)
             menuOptimizer = MenuOptimizer(ctx)
+            webViewDownloadHelper = WebViewDownloadHelper(ctx)
         }
     }
 
@@ -208,6 +211,9 @@ class WebViewFragment : Fragment() {
 
             // Performans optimizasyonlarını uygula
             performanceOptimizer.optimizeWebView(this)
+
+            // İndirme modülünü kur
+            webViewDownloadHelper.setupWebViewDownloads(this)
 
             // Client'ları ayarla
             webViewClient = object : WebViewClient() {
@@ -429,6 +435,11 @@ class WebViewFragment : Fragment() {
 
     override fun onDestroy() {
         super.onDestroy()
+
+        // İndirme helper'ını temizle
+        if (this::webViewDownloadHelper.isInitialized) {
+            webViewDownloadHelper.cleanup()
+        }
 
         // FragmentCache kullanıldığından, sadece aktivite sonlandığında kaynakları temizle
         if (activity?.isFinishing == true) {

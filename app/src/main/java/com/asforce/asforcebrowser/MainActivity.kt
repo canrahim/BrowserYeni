@@ -22,6 +22,8 @@ import com.asforce.asforcebrowser.presentation.main.MainViewModel
 import com.asforce.asforcebrowser.util.normalizeUrl
 import com.asforce.asforcebrowser.util.viewpager.FragmentCache
 import com.asforce.asforcebrowser.util.viewpager.ViewPager2Optimizer
+import com.asforce.asforcebrowser.download.DownloadManager
+import com.asforce.asforcebrowser.download.WebViewDownloadHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -39,6 +41,8 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     private lateinit var tabAdapter: TabAdapter
     private lateinit var pagerAdapter: BrowserPagerAdapter
     private lateinit var viewPagerOptimizer: ViewPager2Optimizer
+    private lateinit var downloadManager: DownloadManager
+    private lateinit var webViewDownloadHelper: WebViewDownloadHelper
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,10 +57,21 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             insets
         }
 
+        setupDownloadManager()
         setupAdapters()
         setupListeners()
         observeViewModel()
         handleOrientationChanges()
+    }
+
+    private fun setupDownloadManager() {
+        // DownloadManager instance'ını al
+        downloadManager = DownloadManager.getInstance(this)
+        // Context'i güncelle
+        downloadManager.updateContext(this)
+        
+        // WebViewDownloadHelper'ı başlat
+        webViewDownloadHelper = WebViewDownloadHelper(this)
     }
 
     private fun setupAdapters() {
@@ -418,8 +433,17 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Context'i güncelle
+        downloadManager.updateContext(this)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+
+        // İndirme modülünü temizle
+        webViewDownloadHelper.cleanup()
 
         // Aktivite kapatılırken tüm fragment durumlarını kaydet ve Fragment Cache'i temizle
         if (isFinishing) {

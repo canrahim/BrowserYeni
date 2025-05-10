@@ -1,3 +1,17 @@
 <resources>
     <string name="app_name">AsforceBrowser</string>
+    
+    <!-- Download strings -->
+    <string name="download_file">İndir</string>
+    <string name="download_cancel">İptal</string>
+    <string name="download_image">Resmi İndir</string>
+    <string name="download_started">%s indiriliyor…</string>
+    <string name="download_completed">%s indirildi</string>
+    <string name="download_completed_title">İndirme tamamlandı</string>
+    <string name="download_completed_generic">İndirme tamamlandı</string>
+    <string name="download_open_prompt">%s dosyasını açmak istiyor musunuz?</string>
+    <string name="download_open">Aç</string>
+    <string name="download_no_app_to_open">Bu dosya türünü açacak bir uygulama bulunamadı</string>
+    <string name="download_open_error">Dosya açılırken hata oluştu</string>
+    <string name="download_failed">İndirme başarısız</string>
 </resources>
