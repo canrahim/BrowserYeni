@@ -23,4 +23,12 @@
     <color name="dividerColor">#E8EAED</color>
     <color name="iconTint">#5F6368</color>
     <color name="iconTintActive">#4285F4</color>
+    
+    <!-- PersonAdapter için eksik renkler -->
+    <color name="selected_item_bg">#E3F2FD</color>
+    <color name="highlighted_item_bg">#BBDEFB</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_tertiary">#BDBDBD</color>
 </resources>

@@ -24,6 +24,11 @@ import com.asforce.asforcebrowser.util.viewpager.FragmentCache
 import com.asforce.asforcebrowser.util.viewpager.ViewPager2Optimizer
 import com.asforce.asforcebrowser.download.DownloadManager
 import com.asforce.asforcebrowser.download.WebViewDownloadHelper
+import com.asforce.asforcebrowser.ui.leakage.LeakageControlActivity
+import com.asforce.asforcebrowser.ui.panel.kotlin.PanelControlActivity
+import com.asforce.asforcebrowser.ui.topraklama.kotlin.TopraklamaControlActivity
+import com.asforce.asforcebrowser.ui.termal.kotlin.Menu4Activity
+import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -31,6 +36,13 @@ import kotlinx.coroutines.launch
 /**
  * MainActivity - Ana ekran
  * Tarayıcı uygulamasının ana aktivitesi, sekme yönetimi ve kullanıcı arayüzünü kontrol eder.
+ * 
+ * Menü Değişikliği: Sol ve sağ menü itemleri güncellendi
+ * Sol: Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama, Termal Kamera
+ * Sağ: Yenile, İleri, İndirilenler
+ * 
+ * Referans: Android Development Documentation - PopupMenu
+ * URL: https://developer.android.com/reference/android/widget/PopupMenu
  */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
@@ -219,9 +231,12 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             }
         }
 
-        // Menü açma butonu dinleyicisi
+        /**
+         * Sol menü açma butonu dinleyicisi 
+         * Menü itemleri: Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama, Termal Kamera
+         */
         binding.menuOpenButton.setOnClickListener { view ->
-            showBrowserMenu(view)
+            showLeftBrowserMenu(view)
         }
 
         // Yeni sekme butonu dinleyicisi
@@ -229,28 +244,97 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             viewModel.createNewTab("https://www.google.com")
         }
 
-        // Menü butonu dinleyicisi
+        /**
+         * Sağ menü butonu dinleyicisi
+         * Menü itemleri: Yenile, İleri, İndirilenler
+         */
         binding.menuButton.setOnClickListener { view ->
-            showBrowserMenu(view)
+            showRightBrowserMenu(view)
         }
     }
 
-    private fun showBrowserMenu(view: View) {
+    /**
+     * Sol menü işlevi - Uygulama özellikleri
+     * Menü itemleri: Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama, Termal Kamera
+     */
+    private fun showLeftBrowserMenu(view: View) {
         val popupMenu = PopupMenu(this, view)
-        popupMenu.menuInflater.inflate(R.menu.browser_menu, popupMenu.menu)
+        
+        // Uygulama özelliklerini ekle
+        val items = arrayOf(
+            "Kaçak Akım",
+            "Pano Fonksiyon Kontrolü",
+            "Topraklama",
+            "Termal Kamera"
+        )
+        
+        // Menü öğelerini ekle
+        items.forEachIndexed { index, item ->
+            popupMenu.menu.add(0, index, index, item)
+        }
 
         popupMenu.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.action_refresh -> {
+                0 -> { // Kaçak Akım
+                    handleKacakAkim()
+                    true
+                }
+                1 -> { // Pano Fonksiyon Kontrolü
+                    handlePanoFonksiyonKontrol()
+                    true
+                }
+                2 -> { // Topraklama
+                    handleTopraklama()
+                    true
+                }
+                3 -> { // Termal Kamera
+                    handleTermalKamera()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        popupMenu.show()
+    }
+
+    /**
+     * Sağ menü işlevi - Tarayıcı işlevleri
+     * Menü itemleri: Yenile, İleri, İndirilenler
+     */
+    private fun showRightBrowserMenu(view: View) {
+        val popupMenu = PopupMenu(this, view)
+        
+        // Tarayıcı işlevlerini ekle
+        val items = arrayOf(
+            "Yenile",
+            "İleri",
+            "İndirilenler"
+        )
+        
+        // Menü öğelerini ekle
+        items.forEachIndexed { index, item ->
+            popupMenu.menu.add(0, index, index, item)
+        }
+
+        popupMenu.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                0 -> { // Yenile
                     val currentTab = viewModel.activeTab.value ?: return@setOnMenuItemClickListener false
                     pagerAdapter.getFragmentByTabId(currentTab.id)?.refresh()
                     true
                 }
-                R.id.action_forward -> {
+                1 -> { // İleri
                     val currentTab = viewModel.activeTab.value ?: return@setOnMenuItemClickListener false
                     val fragment = pagerAdapter.getFragmentByTabId(currentTab.id)
                     if (fragment?.canGoForward() == true) {
                         fragment.goForward()
+                    }
+                    true
+                }
+                2 -> { // İndirilenler
+                    if (downloadManager != null) {
+                        downloadManager.showDownloadsManager(this)
                     }
                     true
                 }
@@ -414,6 +498,31 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         if (currentTab != null) {
             FragmentCache.saveFragmentState(currentTab.id, supportFragmentManager)
         }
+    }
+    
+    // Handler fonksiyonları
+    private fun handleKacakAkim() {
+        // Kaçak Akım aktivitesini başlat
+        val intent = Intent(this, LeakageControlActivity::class.java)
+        startActivity(intent)
+    }
+    
+    private fun handlePanoFonksiyonKontrol() {
+        // Pano Fonksiyon Kontrol aktivitesini başlat
+        val intent = Intent(this, PanelControlActivity::class.java)
+        startActivity(intent)
+    }
+    
+    private fun handleTopraklama() {
+        // Topraklama Kontrol aktivitesini başlat
+        val intent = Intent(this, TopraklamaControlActivity::class.java)
+        startActivity(intent)
+    }
+    
+    private fun handleTermalKamera() {
+        // Termal Kamera aktivitesini başlat
+        val intent = Intent(this, Menu4Activity::class.java)
+        startActivity(intent)
     }
 
     /**

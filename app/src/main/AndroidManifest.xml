@@ -37,6 +37,27 @@
             </intent-filter>
         </activity>
         
+        <!-- New Activities -->
+        <activity
+            android:name=".ui.leakage.LeakageControlActivity"
+            android:exported="false" />
+        
+        <activity
+            android:name=".ui.panel.kotlin.PanoFonksiyonActivity"
+            android:exported="false" />
+        
+        <activity
+            android:name=".ui.panel.kotlin.PanelControlActivity"
+            android:exported="false" />
+        
+        <activity
+            android:name=".ui.topraklama.kotlin.TopraklamaControlActivity"
+            android:exported="false" />
+        
+        <activity
+            android:name=".ui.termal.kotlin.Menu4Activity"
+            android:exported="false" />
+        
         <!-- FileProvider for file access -->
         <provider
             android:name="androidx.core.content.FileProvider"

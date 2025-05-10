@@ -90,6 +90,9 @@ dependencies {
     // JSoup - HTML parsing için (favicon URL'lerini bulmak için)
     implementation("org.jsoup:jsoup:1.16.1")
     
+    // Volley - HTTP istekleri için
+    implementation("com.android.volley:volley:1.2.1")
+    
     // Test kütüphaneleri
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
