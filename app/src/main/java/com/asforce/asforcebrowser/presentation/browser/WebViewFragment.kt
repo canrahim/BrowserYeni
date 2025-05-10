@@ -53,17 +53,20 @@ class WebViewFragment : Fragment() {
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             super.onPageStarted(view, url, favicon)
             url?.let {
-                // URL değişimini viewModel'e bildir
-                viewModel.updateCurrentUrl(it)
+            // URL değişimini viewModel'e bildir
+            viewModel.updateCurrentUrl(it)
 
-                // Sekme verilerini güncelle
-                lifecycleScope.launch {
-                    viewModel.updateTab(tabId, it, view?.title ?: "Yükleniyor...", favicon)
-                }
+            // Sekme verilerini güncelle
+            lifecycleScope.launch {
+            viewModel.updateTab(tabId, it, view?.title ?: "Yükleniyor...", favicon)
             }
 
-            // BrowserActivity'ye sayfa yüklenmeye başladığını bildir
-            (activity as? BrowserCallback)?.onPageLoadStarted()
+                        // MainActivity'ye URL değişikliğini bildir
+                (activity as? BrowserCallback)?.onUrlChanged(it)
+            }
+
+                    // BrowserActivity'ye sayfa yüklenmeye başladığını bildir
+                    (activity as? BrowserCallback)?.onPageLoadStarted()
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
@@ -237,6 +240,9 @@ class WebViewFragment : Fragment() {
                                 menuOptimizer.optimizeMenuPerformance(view)
                             }, 200)
                         }
+
+                        // MainActivity'ye URL değişikliğini bildir
+                        (activity as? BrowserCallback)?.onUrlChanged(it)
                     }
 
                     // BrowserActivity'ye sayfa yüklenmeye başladığını bildir
@@ -459,5 +465,6 @@ class WebViewFragment : Fragment() {
         fun onPageLoadStarted()
         fun onPageLoadFinished()
         fun onProgressChanged(progress: Int)
+        fun onUrlChanged(url: String)
     }
 }

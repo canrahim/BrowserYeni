@@ -32,6 +32,7 @@ import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import com.asforce.asforcebrowser.util.DataHolder
 
 /**
  * MainActivity - Ana ekran
@@ -192,6 +193,10 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
 
                     // Adres çubuğunu güncelle
                     viewModel.updateAddressBar(tab.url)
+                    
+                    // URL'deki son rakamları DataHolder'a kaydet
+                    // Sekme değişiminde de çağrılır
+                    saveLastDigitsToDataHolder(tab.url)
                 }
             }
         })
@@ -409,6 +414,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
 
                     // Adres çubuğunu güncelle
                     viewModel.updateAddressBar(it.url)
+                    
+                    // URL'deki son rakamları DataHolder'a kaydet
+                    saveLastDigitsToDataHolder(it.url)
                 }
             }
         }
@@ -450,6 +458,15 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
 
     override fun onProgressChanged(progress: Int) {
         // İlerleme çubuğu özellikleri burada ayarlanabilir
+    }
+
+    /**
+     * WebView'de URL değiştiğinde çağrılır
+     * Bu metod WebViewFragment.BrowserCallback interface'inden gelir
+     */
+    override fun onUrlChanged(url: String) {
+        // URL değiştiğinde DataHolder'a kaydet
+        saveLastDigitsToDataHolder(url)
     }
 
     /**
@@ -548,6 +565,59 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         downloadManager.updateContext(this)
     }
 
+    /**
+     * URL'deki son rakamları DataHolder'a kaydeder
+     * Aktif sekme değiştiğinde çağrılır
+     */
+    private fun saveLastDigitsToDataHolder(url: String) {
+        if (url.isNotEmpty()) {
+            // URL'den son rakamları ayıkla
+            val lastDigits = extractLastDigits(url)
+            
+            // DataHolder'a kaydet
+            DataHolder.url = lastDigits
+            
+            // Log ekle
+            println("DataHolder.url güncellendi: $lastDigits")
+        }
+    }
+    
+    /**
+     * Verilen URL'den son rakamları çıkarır
+     * 
+     * @param url Analiz edilecek URL
+     * @return URL'deki tüm rakamlar veya son rakamlar
+     */
+    private fun extractLastDigits(url: String): String {
+        try {
+            // URL'den tüm rakamları çıkar
+            val digits = url.filter { it.isDigit() }
+            
+            // Eğer rakam yoksa boş string döndür
+            if (digits.isEmpty()) {
+                return ""
+            }
+            
+            // Eğer URL bir IP adresi gibi görünüyorsa, tüm rakamları al
+            if (url.contains(".") && url.split(".").size > 2) {
+                return digits
+            }
+            
+            // Diğer durumlarda son rakamları al
+            val digitCount = 3  // Son kaç rakam alınacak
+            
+            return if (digits.length <= digitCount) {
+                digits
+            } else {
+                digits.takeLast(digitCount)
+            }
+        } catch (e: Exception) {
+            // Hata durumunda boş string döndür
+            println("URL'den rakam çıkarılırken hata: ${e.message}")
+            return ""
+        }
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
 
