@@ -7,6 +7,7 @@ plugins {
 
 android {
     namespace = "com.asforce.asforcebrowser"
+
     compileSdk = 34
 
     defaultConfig {
@@ -21,6 +22,7 @@ android {
     
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     buildTypes {

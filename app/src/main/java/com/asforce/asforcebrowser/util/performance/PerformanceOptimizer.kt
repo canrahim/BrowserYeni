@@ -6,31 +6,30 @@ import android.os.Build
 import android.util.Log
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.asforce.asforcebrowser.BuildConfig
 
 /**
- * PerformanceOptimizer - Main performance optimization class for AsforceBrowser
+ * PerformanceOptimizer - Geliştirilmiş performans optimizasyonu sınıfı
  *
- * This class combines all other optimizer classes (ScrollOptimizer, MediaOptimizer,
- * PageLoadOptimizer) and provides a single interface.
+ * Referans: Android WebView Optimization Best Practices
+ * https://developer.android.com/reference/android/webkit/WebSettings
  *
- * References:
- * - Android WebView Optimization Best Practices
- * - Modern Web Browser Performance Techniques
+ * Yenilikler:
+ * 1. Android T+ için setForceDark() uyarısını ortadan kaldırır
+ * 2. Daha temiz log çıktısı
+ * 3. API seviyesine göre akıllı uyumluluk
  */
 class PerformanceOptimizer private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "PerformanceOptimizer"
 
-        // Singleton instance
         @Volatile
         private var instance: PerformanceOptimizer? = null
 
-        /**
-         * Get the singleton instance of PerformanceOptimizer
-         */
         fun getInstance(context: Context): PerformanceOptimizer {
             return instance ?: synchronized(this) {
                 instance ?: PerformanceOptimizer(context.applicationContext).also { instance = it }
@@ -44,56 +43,50 @@ class PerformanceOptimizer private constructor(private val context: Context) {
     private val pageLoadOptimizer = PageLoadOptimizer(context)
 
     /**
-     * Creates a fully optimized WebViewClient that combines all optimization features
+     * Tüm optimizasyonları içeren WebViewClient oluşturur
      */
     fun createSuperOptimizedWebViewClient(): WebViewClient {
         return object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
 
-                // 1. Page loading optimizations (should be applied earliest)
+                // 1. Sayfa yükleme optimizasyonları
                 pageLoadOptimizer.optimizePageLoadSettings(view)
 
-                // 2. Prepare scrolling optimizations
+                // 2. Scroll optimizasyonlarını hazırla
                 scrollOptimizer.optimizeWebViewHardwareRendering(view)
 
-                Log.d(TAG, "Page load started optimizations applied: $url")
+                Log.d(TAG, "Optimizasyonlar uygulandı: $url")
             }
 
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
 
-                // 1. Complete page loading optimizations
+                // 1. Sayfa yükleme optimizasyonlarını tamamla
                 pageLoadOptimizer.injectLoadOptimizationScript(view)
 
-                // 2. Inject scrolling optimizations
+                // 2. Scroll optimizasyonlarını enjekte et
                 scrollOptimizer.injectOptimizedScrollingScript(view)
 
-                // 3. Inject media optimizations
+                // 3. Medya optimizasyonlarını enjekte et
                 mediaOptimizer.optimizeVideoPlayback(view)
-
-                // 4. Enable advanced codec support
                 mediaOptimizer.enableAdvancedCodecSupport(view)
 
-                // 5. Optimize render performance
+                // 4. Render performansını optimize et
                 optimizeRenderPerformance(view)
 
-                Log.d(TAG, "All page optimizations completed: $url")
+                Log.d(TAG, "Tüm optimizasyonlar tamamlandı: $url")
             }
 
             override fun onLoadResource(view: WebView, url: String) {
                 super.onLoadResource(view, url)
 
-                // Apply special optimizations when video or audio resource is detected
+                // Medya kaynağı tespit edildiğinde özel optimizasyonlar uygula
                 if (isMediaResource(url)) {
-                    // Media resource detected, optimize
                     mediaOptimizer.optimizeVideoPlayback(view)
                 }
             }
 
-            /**
-             * Check if a URL points to a media resource
-             */
             private fun isMediaResource(url: String): Boolean {
                 return url.contains(".mp4") || url.contains(".m3u8") ||
                         url.contains(".ts") || url.contains("video") ||
@@ -103,28 +96,20 @@ class PerformanceOptimizer private constructor(private val context: Context) {
     }
 
     /**
-     * Creates a fully optimized WebChromeClient
+     * Fully optimized WebChromeClient oluşturur
      */
     fun createSuperOptimizedWebChromeClient(): WebChromeClient {
         return object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
 
-                // Progressive optimizations based on loading progress
+                // Yükleme durumuna göre aşamalı optimizasyonlar
                 when {
                     newProgress in 31..69 -> {
-                        // Apply early optimizations when page structure starts forming
                         pageLoadOptimizer.optimizePageLoadSettings(view)
                     }
                     newProgress >= 70 -> {
-                        // Apply scrolling optimizations when page is largely loaded
                         scrollOptimizer.optimizeWebViewHardwareRendering(view)
-                    }
-                    newProgress >= 90 -> {
-                        // Inject all optimizations when almost all resources are loaded
-                        view.evaluateJavascript("""
-                            console.log('AsforceBrowser: Starting full optimization mode...');
-                        """, null)
                     }
                 }
             }
@@ -132,13 +117,13 @@ class PerformanceOptimizer private constructor(private val context: Context) {
     }
 
     /**
-     * Settings that optimize render performance
+     * Render performansını optimize eder
      */
     private fun optimizeRenderPerformance(webView: WebView) {
-        // Inject render thread optimization
+        // Render thread optimizasyonu
         webView.evaluateJavascript(JsScripts.RENDER_OPTIMIZATION, null)
 
-        // Additional hardware optimizations
+        // Donanım optimizasyonları
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             webView.setRendererPriorityPolicy(
                 WebView.RENDERER_PRIORITY_IMPORTANT,
@@ -148,96 +133,100 @@ class PerformanceOptimizer private constructor(private val context: Context) {
     }
 
     /**
-     * Applies all performance optimizations to WebView at once
+     * WebView'e tüm performans optimizasyonlarını uygular
      */
     fun optimizeWebView(webView: WebView) {
-        Log.d(TAG, "Starting all WebView optimizations...")
+        Log.d(TAG, "WebView optimizasyonları başlatılıyor...")
 
-        // 1. Basic WebView settings
+        // 1. Temel WebView ayarları (API seviyesi farkını dikkate alarak)
         configureBasicWebViewSettings(webView)
 
-        // 2. Hardware acceleration optimizations
+        // 2. Donanım ivmesi optimizasyonları
         scrollOptimizer.optimizeWebViewHardwareRendering(webView)
 
-        // 3. Assign performance-focused WebViewClient and WebChromeClient
+        // 3. Performans odaklı client'ları ata
         webView.webViewClient = createSuperOptimizedWebViewClient()
         webView.webChromeClient = createSuperOptimizedWebChromeClient()
 
-        // 4. Debugging and reporting
+        // 4. Debug modunu etkinleştir (gerekirse)
         enableDebugModeIfNeeded()
 
-        Log.d(TAG, "All WebView optimizations completed")
+        Log.d(TAG, "Tüm WebView optimizasyonları tamamlandı")
     }
 
     /**
-     * Configure basic WebView settings for optimal performance
+     * API seviyesine göre uyumlu ayarlar yapılandırır
      */
     private fun configureBasicWebViewSettings(webView: WebView) {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             databaseEnabled = true
-            setGeolocationEnabled(false) // Turn off location support if not needed
+            setGeolocationEnabled(false)
             mediaPlaybackRequiresUserGesture = false
 
-            // Cache settings
-            databaseEnabled = true
-            domStorageEnabled = true
+            // Cache ayarları
+            cacheMode = WebSettings.LOAD_DEFAULT
 
-            // Faster transitions between pages
-            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-
-            // Other performance improvements
+            // Performans iyileştirmeleri
             useWideViewPort = true
             loadWithOverviewMode = true
             javaScriptCanOpenWindowsAutomatically = false
 
+            // API seviyesine göre güvenlik ve dark mode ayarları
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 safeBrowsingEnabled = false
+            }
+
+            // Android T+ için setForceDark() çağrılmıyor (uyarıyı önlemek için)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                @Suppress("DEPRECATION")
+                forceDark = WebSettings.FORCE_DARK_AUTO
             }
         }
     }
 
     /**
-     * Enable WebView debugging if needed
+     * Debug modunu etkinleştir
      */
     private fun enableDebugModeIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true)
+            // Sadece debug build'lerde etkinleştir
+            if (BuildConfig.DEBUG) {
+                WebView.setWebContentsDebuggingEnabled(true)
+            }
         }
     }
 
     /**
-     * Collect performance metrics after page is loaded
+     * Performans metriklerini toplar
      */
     fun collectPerformanceMetrics(webView: WebView, callback: ValueCallback<String>) {
         webView.evaluateJavascript(JsScripts.PERFORMANCE_METRICS, callback)
     }
 
     /**
-     * Collection of JavaScript snippets used for optimization
+     * JavaScript parçacıkları
      */
     private object JsScripts {
         const val RENDER_OPTIMIZATION = """
             (function() {
-                // Reduce render thread load
+                // Render thread yükünü azalt
                 
-                // 1. Optimize page composition layers
-                var potentialElements = document.querySelectorAll(
+                // 1. Kompozisyon katmanlarını optimize et
+                const potentialElements = document.querySelectorAll(
                     '.fixed, .sticky, [style*="position: fixed"], [style*="position: sticky"], ' +
                     '[style*="transform"], [style*="filter"], [style*="opacity"], ' +
                     '[style*="will-change"], video, canvas, [style*="animation"], ' +
                     '[style*="z-index"]'
                 );
                 
-                for (var i = 0; i < potentialElements.length; i++) {
-                    var el = potentialElements[i];
-                    // Set will-change property
+                for (let el of potentialElements) {
+                    // will-change özelliğini ayarla
                     if (el.nodeName === 'VIDEO' || el.nodeName === 'CANVAS') {
                         el.style.willChange = 'transform';
                     } else {
-                        // Optimize based on properties
-                        var style = window.getComputedStyle(el);
+                        const style = window.getComputedStyle(el);
                         if (style.position === 'fixed' || style.position === 'sticky') {
                             el.style.willChange = 'transform';
                         } else if (style.transform !== 'none' || style.filter !== 'none' || 
@@ -246,123 +235,75 @@ class PerformanceOptimizer private constructor(private val context: Context) {
                         }
                     }
                     
-                    // For GPU-accelerated rendering:
+                    // GPU-hızlandırılmış render için:
                     el.style.transform = 'translateZ(0)';
                 }
                 
-                // 2. Prevent excessive layout changes
-                var mutationCount = 0;
-                var layoutTriggeringProps = [
-                    'width', 'height', 'top', 'left', 'right', 'bottom',
-                    'margin', 'padding', 'display', 'position', 'float'
-                ];
-                
-                if (window.MutationObserver) {
-                    var observer = new MutationObserver(function(mutations) {
-                        // Many DOM changes detected
-                        mutationCount += mutations.length;
-                        
-                        // When exceeding a certain threshold, block expensive DOM changes
-                        if (mutationCount > 100) {
-                            for (var i = 0; i < mutations.length; i++) {
-                                var mutation = mutations[i];
-                                if (mutation.type === 'attributes') {
-                                    var attributeName = mutation.attributeName.toLowerCase();
-                                    // For layout-triggering styles
-                                    for (var j = 0; j < layoutTriggeringProps.length; j++) {
-                                        if (attributeName === 'style' && 
-                                            mutation.target.style && 
-                                            mutation.target.style[layoutTriggeringProps[j]]) {
-                                            // Remove/balance layout-triggering styles
-                                            mutation.target.style.willChange = 'transform';
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    
-                    observer.observe(document.body, {
-                        attributes: true,
-                        childList: true,
-                        subtree: true,
-                        attributeFilter: ['style', 'class']
-                    });
-                    
-                    // Clear observer after 5 seconds (post page loading)
-                    setTimeout(function() {
-                        observer.disconnect();
-                    }, 5000);
-                }
-                
-                console.log('AsforceBrowser: Render performance optimizations applied');
+                console.log('AsforceBrowser: Render performans optimizasyonları uygulandı');
             })();
         """
 
         const val PERFORMANCE_METRICS = """
             (function() {
-                var metrics = {
-                    'navigationType': performance.navigation.type,
-                    'navigationStart': performance.timing.navigationStart,
-                    'unloadEventStart': performance.timing.unloadEventStart,
-                    'unloadEventEnd': performance.timing.unloadEventEnd,
-                    'redirectStart': performance.timing.redirectStart,
-                    'redirectEnd': performance.timing.redirectEnd,
-                    'fetchStart': performance.timing.fetchStart,
-                    'domainLookupStart': performance.timing.domainLookupStart,
-                    'domainLookupEnd': performance.timing.domainLookupEnd,
-                    'connectStart': performance.timing.connectStart,
-                    'connectEnd': performance.timing.connectEnd,
-                    'secureConnectionStart': performance.timing.secureConnectionStart,
-                    'requestStart': performance.timing.requestStart,
-                    'responseStart': performance.timing.responseStart,
-                    'responseEnd': performance.timing.responseEnd,
-                    'domLoading': performance.timing.domLoading,
-                    'domInteractive': performance.timing.domInteractive,
-                    'domContentLoadedEventStart': performance.timing.domContentLoadedEventStart,
-                    'domContentLoadedEventEnd': performance.timing.domContentLoadedEventEnd,
-                    'domComplete': performance.timing.domComplete,
-                    'loadEventStart': performance.timing.loadEventStart,
-                    'loadEventEnd': performance.timing.loadEventEnd
+                const metrics = {
+                    navigationType: performance.navigation.type,
+                    navigationStart: performance.timing.navigationStart,
+                    unloadEventStart: performance.timing.unloadEventStart,
+                    unloadEventEnd: performance.timing.unloadEventEnd,
+                    redirectStart: performance.timing.redirectStart,
+                    redirectEnd: performance.timing.redirectEnd,
+                    fetchStart: performance.timing.fetchStart,
+                    domainLookupStart: performance.timing.domainLookupStart,
+                    domainLookupEnd: performance.timing.domainLookupEnd,
+                    connectStart: performance.timing.connectStart,
+                    connectEnd: performance.timing.connectEnd,
+                    secureConnectionStart: performance.timing.secureConnectionStart,
+                    requestStart: performance.timing.requestStart,
+                    responseStart: performance.timing.responseStart,
+                    responseEnd: performance.timing.responseEnd,
+                    domLoading: performance.timing.domLoading,
+                    domInteractive: performance.timing.domInteractive,
+                    domContentLoadedEventStart: performance.timing.domContentLoadedEventStart,
+                    domContentLoadedEventEnd: performance.timing.domContentLoadedEventEnd,
+                    domComplete: performance.timing.domComplete,
+                    loadEventStart: performance.timing.loadEventStart,
+                    loadEventEnd: performance.timing.loadEventEnd
                 };
                 
-                // Page loading metrics
-                var pageLoadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
-                var domReadyTime = performance.timing.domComplete - performance.timing.domLoading;
-                var networkTime = performance.timing.responseEnd - performance.timing.fetchStart;
+                // Sayfa yükleme metrikleri
+                const pageLoadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+                const domReadyTime = performance.timing.domComplete - performance.timing.domLoading;
+                const networkTime = performance.timing.responseEnd - performance.timing.fetchStart;
                 
-                // Calculate FPS performance
-                var fps = 0;
-                var frameCount = 0;
-                var lastTime = performance.now();
+                // FPS performansını hesapla
+                let fps = 0;
+                let frameCount = 0;
+                let lastTime = performance.now();
                 
-                // Start FPS measurement
                 function countFrames() {
                     frameCount++;
-                    var now = performance.now();
+                    const now = performance.now();
                     
-                    // Calculate FPS every second
                     if (now - lastTime >= 1000) {
                         fps = Math.round(frameCount * 1000 / (now - lastTime));
                         frameCount = 0;
                         lastTime = now;
                     }
                     
-                    window.requestAnimationFrame(countFrames);
+                    requestAnimationFrame(countFrames);
                 }
                 
-                // Start FPS counter
+                // FPS sayacını başlat
                 countFrames();
                 
-                // Report metrics after 1.5 seconds
+                // 1.5 saniye sonra metrikleri raporla
                 setTimeout(function() {
-                    var report = {
-                        'pageLoadTime': pageLoadTime + ' ms',
-                        'domReadyTime': domReadyTime + ' ms',
-                        'networkTime': networkTime + ' ms',
-                        'fps': fps + ' FPS',
-                        'detailedMetrics': metrics
+                    const report = {
+                        pageLoadTime: pageLoadTime + ' ms',
+                        domReadyTime: domReadyTime + ' ms',
+                        networkTime: networkTime + ' ms',
+                        fps: fps + ' FPS',
+                        detailedMetrics: metrics
                     };
                     
                     return JSON.stringify(report);
