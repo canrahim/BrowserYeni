@@ -5,194 +5,312 @@ import android.util.Log
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import java.util.regex.Pattern
-import java.util.regex.Matcher
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Utility class for identifying and handling special download URLs.
+ * Optimized with caching and improved pattern matching.
  */
 object DownloadUrlHelper {
     private const val TAG = "DownloadUrlHelper"
-    
+    private const val DEBUG = false // Turn off for production
+
+    // Cache for common URL patterns and MIME types
+    private val downloadPatternCache = ConcurrentHashMap<String, Boolean>()
+    private val mimeTypeCache = ConcurrentHashMap<String, String?>()
+    private val fileNameCache = ConcurrentHashMap<String, String?>()
+
+    // Cached regex patterns for better performance
+    private val fileExtensionPattern by lazy {
+        Pattern.compile(".*\\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|7z|txt|csv)($|\\?.*)")
+    }
+
+    private val contentDispositionPattern by lazy {
+        Pattern.compile("filename\\*?=['\"]?(?:UTF-\\d['\"]*)?([^;\\r\\n\"']*)['\"]?;?", Pattern.CASE_INSENSITIVE)
+    }
+
+    private val fallbackPattern by lazy {
+        Pattern.compile("filename=['\"]?([^;\\r\\n\"']*)['\"]?", Pattern.CASE_INSENSITIVE)
+    }
+
+    // Common download URL patterns
+    private val downloadUrlPatterns = listOf(
+        "/EXT/PKControl/DownloadFile",
+        "/DownloadFile",
+        "/download.php",
+        "/filedownload",
+        "/file_download",
+        "/getfile",
+        "/get_file"
+    )
+
     /**
-     * Checks if a URL is a download URL.
-     *
-     * @param url The URL to check
-     * @return True if the URL is a download URL, false otherwise
+     * Checks if a URL is a download URL using caching.
      */
     fun isDownloadUrl(url: String?): Boolean {
-        if (url.isNullOrEmpty()) {
-            return false
-        }
-        
-        // Common download path patterns
-        return url.contains("/EXT/PKControl/DownloadFile") ||
-               url.contains("/DownloadFile") ||
-               url.contains("/download.php") ||
-               url.contains("/filedownload") ||
-               url.contains("/file_download") ||
-               url.contains("/getfile") ||
-               url.contains("/get_file") ||
-               (url.contains("download") && url.contains("id=")) ||
-               Pattern.compile(".*\\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|7z|txt|csv)($|\\?.*)").matcher(url).matches()
+        if (url.isNullOrEmpty()) return false
+
+        // Check cache first
+        downloadPatternCache[url]?.let { return it }
+
+        val isDownload = checkDownloadPattern(url)
+        downloadPatternCache[url] = isDownload
+        return isDownload
     }
-    
+
+    private fun checkDownloadPattern(url: String): Boolean {
+        val lowerUrl = url.lowercase()
+
+        // Check common download patterns
+        for (pattern in downloadUrlPatterns) {
+            if (lowerUrl.contains(pattern)) return true
+        }
+
+        // Check for download with id parameter
+        if (lowerUrl.contains("download") && lowerUrl.contains("id=")) return true
+
+        // Check file extension pattern
+        if (fileExtensionPattern.matcher(url).matches()) return true
+
+        return false
+    }
+
     /**
-     * Gets the file name from a URL.
-     *
-     * @param url The URL to get the file name from
-     * @return The file name
+     * Gets the file name from a URL with improved caching.
      */
     fun getFileNameFromUrl(url: String?): String? {
-        if (url.isNullOrEmpty()) {
-            return null
-        }
-        
-        // Try to extract file name from URL
-        var fileName = URLUtil.guessFileName(url, null, null)
-        
-        // If URL has query parameters, try to extract file name from them
-        val uri = Uri.parse(url)
-        val fileParam = uri.getQueryParameter("file")
-        if (!fileParam.isNullOrEmpty()) {
-            fileName = fileParam
-        }
-        
-        val nameParam = uri.getQueryParameter("name")
-        if (!nameParam.isNullOrEmpty()) {
-            fileName = nameParam
-        }
-        
-        val fnParam = uri.getQueryParameter("fn")
-        if (!fnParam.isNullOrEmpty()) {
-            fileName = fnParam
-        }
-        
-        // Special handling for specific URLs
-        if (url.contains("/EXT/PKControl/DownloadFile") || url.contains("/DownloadFile")) {
-            val type = uri.getQueryParameter("type")
-            val id = uri.getQueryParameter("id")
-            
-            if (type != null && type.startsWith("F") && type.length > 1) {
-                fileName = type.substring(1)
-            } else if (!id.isNullOrEmpty()) {
-                fileName = "download_$id"
-            }
-        }
-        
-        // Ensure file name has extension
-        if (fileName != null && !fileName.contains(".")) {
-            val mimeType = getMimeTypeFromUrl(url)
-            val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
-            fileName = if (extension != null) {
-                "$fileName.$extension"
-            } else {
-                // Default to .bin if can't determine extension
-                "$fileName.bin"
-            }
-        }
-        
+        if (url.isNullOrEmpty()) return null
+
+        // Check cache first
+        fileNameCache[url]?.let { return it }
+
+        var fileName = extractFileName(url)
+
+        // Cache the result
+        fileNameCache[url] = fileName
         return fileName
     }
-    
-    /**
-     * Gets the MIME type from a URL.
-     *
-     * @param url The URL to get the MIME type from
-     * @return The MIME type
-     */
-    fun getMimeTypeFromUrl(url: String?): String? {
-        if (url.isNullOrEmpty()) {
-            return null
-        }
-        
-        // Check for common file extensions
-        return when {
-            url.lowercase().endsWith(".pdf") -> "application/pdf"
-            url.lowercase().endsWith(".doc") -> "application/msword"
-            url.lowercase().endsWith(".docx") -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            url.lowercase().endsWith(".xls") -> "application/vnd.ms-excel"
-            url.lowercase().endsWith(".xlsx") -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            url.lowercase().endsWith(".ppt") -> "application/vnd.ms-powerpoint"
-            url.lowercase().endsWith(".pptx") -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            url.lowercase().endsWith(".zip") -> "application/zip"
-            url.lowercase().endsWith(".rar") -> "application/x-rar-compressed"
-            url.lowercase().endsWith(".7z") -> "application/x-7z-compressed"
-            url.lowercase().endsWith(".txt") -> "text/plain"
-            url.lowercase().endsWith(".csv") -> "text/csv"
-            url.lowercase().endsWith(".jpg") || url.lowercase().endsWith(".jpeg") -> "image/jpeg"
-            url.lowercase().endsWith(".png") -> "image/png"
-            url.lowercase().endsWith(".gif") -> "image/gif"
-            url.lowercase().endsWith(".mp3") -> "audio/mpeg"
-            url.lowercase().endsWith(".mp4") -> "video/mp4"
-            url.lowercase().endsWith(".webm") -> "video/webm"
-            else -> {
-                // Try to extract extension from URL
-                val extension = MimeTypeMap.getFileExtensionFromUrl(url)
-                if (!extension.isNullOrEmpty()) {
-                    val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-                    if (mimeType != null) {
-                        return mimeType
-                    }
-                }
-                // Default to octet-stream
-                "application/octet-stream"
+
+    private fun extractFileName(url: String): String? {
+        try {
+            val uri = Uri.parse(url)
+
+            // Try to extract file name from query parameters
+            var fileName = extractFileNameFromParams(uri)
+
+            // Special handling for specific download URLs
+            if (fileName == null && (url.contains("/EXT/PKControl/DownloadFile") || url.contains("/DownloadFile"))) {
+                fileName = handleSpecialDownloadUrls(uri)
             }
+
+            // Fallback to URLUtil
+            if (fileName == null) {
+                fileName = URLUtil.guessFileName(url, null, null)
+            }
+
+            // Ensure file name has extension
+            if (fileName != null && !fileName.contains(".")) {
+                val mimeType = getMimeTypeFromUrl(url)
+                val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+                fileName = if (extension != null) {
+                    "$fileName.$extension"
+                } else {
+                    "$fileName.bin"
+                }
+            }
+
+            return fileName
+        } catch (e: Exception) {
+            if (DEBUG) Log.e(TAG, "Error extracting filename from URL: $url", e)
+            return null
         }
     }
-    
+
+    private fun extractFileNameFromParams(uri: Uri): String? {
+        // Check common parameter names
+        listOf("file", "name", "fn").forEach { param ->
+            uri.getQueryParameter(param)?.let { return it }
+        }
+        return null
+    }
+
+    private fun handleSpecialDownloadUrls(uri: Uri): String? {
+        val type = uri.getQueryParameter("type")
+        val id = uri.getQueryParameter("id")
+
+        return when {
+            type != null && type.startsWith("F") && type.length > 1 -> type.substring(1)
+            !id.isNullOrEmpty() -> "download_$id"
+            else -> null
+        }
+    }
+
     /**
-     * Extracts file name from content disposition header.
-     *
-     * @param contentDisposition The content disposition header
-     * @return The file name
+     * Gets the MIME type from a URL with caching.
+     */
+    fun getMimeTypeFromUrl(url: String?): String? {
+        if (url.isNullOrEmpty()) return null
+
+        // Check cache first
+        mimeTypeCache[url]?.let { return it }
+
+        val mimeType = determineMimeType(url)
+        mimeTypeCache[url] = mimeType
+        return mimeType
+    }
+
+    private fun determineMimeType(url: String): String? {
+        val lowerUrl = url.lowercase()
+
+        // Define MIME type mappings
+        val extensionToMimeMap = mapOf(
+            ".pdf" to "application/pdf",
+            ".doc" to "application/msword",
+            ".docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" to "application/vnd.ms-excel",
+            ".xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".ppt" to "application/vnd.ms-powerpoint",
+            ".pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".zip" to "application/zip",
+            ".rar" to "application/x-rar-compressed",
+            ".7z" to "application/x-7z-compressed",
+            ".txt" to "text/plain",
+            ".csv" to "text/csv",
+            ".jpg" to "image/jpeg",
+            ".jpeg" to "image/jpeg",
+            ".png" to "image/png",
+            ".gif" to "image/gif",
+            ".mp3" to "audio/mpeg",
+            ".mp4" to "video/mp4",
+            ".webm" to "video/webm"
+        )
+
+        // Check for extensions in URL
+        for ((extension, mimeType) in extensionToMimeMap) {
+            if (lowerUrl.endsWith(extension)) {
+                return mimeType
+            }
+        }
+
+        // Try to extract extension from URL using URLUtil
+        val extension = MimeTypeMap.getFileExtensionFromUrl(url)
+        if (!extension.isNullOrEmpty()) {
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)?.let {
+                return it
+            }
+        }
+
+        // Check URL patterns for format hints
+        return checkUrlPatternsForMimeType(lowerUrl)
+    }
+
+    private fun checkUrlPatternsForMimeType(lowerUrl: String): String? {
+        val patternToMimeMap = mapOf(
+            "pdf=true" to "application/pdf",
+            "format=pdf" to "application/pdf",
+            "format=jpg" to "image/jpeg",
+            "format=jpeg" to "image/jpeg",
+            "format=png" to "image/png",
+            "format=gif" to "image/gif"
+        )
+
+        for ((pattern, mimeType) in patternToMimeMap) {
+            if (lowerUrl.contains(pattern)) {
+                return mimeType
+            }
+        }
+
+        return "application/octet-stream"
+    }
+
+    /**
+     * Extracts file name from content disposition header with improved regex.
      */
     fun extractFileNameFromContentDisposition(contentDisposition: String?): String? {
-        if (contentDisposition.isNullOrEmpty()) {
-            return null
-        }
-        
+        if (contentDisposition.isNullOrEmpty()) return null
+
         try {
-            val pattern = Pattern.compile(
-                "filename\\*?=['\"]?(?:UTF-\\d['\"]*)?([^;\\r\\n\"']*)['\"]?;?", 
-                Pattern.CASE_INSENSITIVE
-            )
-            val matcher = pattern.matcher(contentDisposition)
-            
-            if (matcher.find()) {
-                var fileName = matcher.group(1)
-                
-                // Decode URL-encoded parts
-                fileName = fileName.replace("%20".toRegex(), " ")
-                    .replace("%[0-9a-fA-F]{2}".toRegex(), "")
-                    .trim()
-                
-                // Remove quotes if present
-                if (fileName.startsWith("\"") && fileName.endsWith("\"")) {
-                    fileName = fileName.substring(1, fileName.length - 1)
+            // First try with the main pattern
+            contentDispositionPattern.matcher(contentDisposition).let { matcher ->
+                if (matcher.find()) {
+                    return processExtractedFileName(matcher.group(1))
                 }
-                
-                // Replace invalid file name characters
-                fileName = fileName.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-                
-                return fileName
             }
-            
-            // Try another pattern as fallback
-            val fallbackPattern = Pattern.compile(
-                "filename=['\"]?([^;\\r\\n\"']*)['\"]?", 
-                Pattern.CASE_INSENSITIVE
-            )
-            val fallbackMatcher = fallbackPattern.matcher(contentDisposition)
-            
-            if (fallbackMatcher.find()) {
-                var fileName = fallbackMatcher.group(1).trim()
-                fileName = fileName.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
-                return fileName
+
+            // Fallback pattern
+            fallbackPattern.matcher(contentDisposition).let { matcher ->
+                if (matcher.find()) {
+                    return processExtractedFileName(matcher.group(1))
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing content disposition: $contentDisposition", e)
+            if (DEBUG) Log.e(TAG, "Error parsing content disposition: $contentDisposition", e)
         }
-        
+
         return null
+    }
+
+    private fun processExtractedFileName(fileName: String?): String? {
+        if (fileName.isNullOrEmpty()) return null
+
+        var processed = fileName.trim()
+
+        // Decode URL-encoded parts
+        processed = decodeUrlEncodedString(processed)
+
+        // Remove surrounding quotes
+        if (processed.startsWith("\"") && processed.endsWith("\"")) {
+            processed = processed.substring(1, processed.length - 1)
+        }
+
+        // Replace invalid file name characters
+        processed = processed.replace("[\\\\/:*?\"<>|]".toRegex(), "_")
+
+        return processed.ifEmpty { null }
+    }
+
+// Problemi çözen kod bloğu:
+
+    private fun decodeUrlEncodedString(input: String): String {
+        var decoded = input
+
+        try {
+            decoded = java.net.URLDecoder.decode(input, "UTF-8")
+        } catch (e: Exception) {
+            // Manual replacement for common Turkish characters
+            val replacements = mapOf(
+                "%20" to " ",
+                "%C4%B0" to "İ",
+                "%C5%9E" to "Ş",
+                "%C3%9C" to "Ü",
+                "%C4%9E" to "Ğ",
+                "%C3%87" to "Ç",
+                "%C3%96" to "Ö",
+                "%C4%B1" to "ı",
+                "%C5%9F" to "ş",
+                "%C3%BC" to "ü",
+                "%C4%9F" to "ğ",
+                "%C3%A7" to "ç",
+                "%C3%B6" to "ö"
+            )
+
+            // Değişken ismi değiştirilerek çözüldü
+            var result = decoded
+            for ((encoded, decodedChar) in replacements) {
+                result = result.replace(encoded, decodedChar)
+            }
+            decoded = result
+        }
+
+        return decoded
+    }
+
+    /**
+     * Clears all caches to free memory
+     */
+    fun clearCaches() {
+        downloadPatternCache.clear()
+        mimeTypeCache.clear()
+        fileNameCache.clear()
     }
 }
