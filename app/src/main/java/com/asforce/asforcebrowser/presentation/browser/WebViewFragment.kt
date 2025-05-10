@@ -19,6 +19,7 @@ import com.asforce.asforcebrowser.util.performance.MediaOptimizer
 import com.asforce.asforcebrowser.util.performance.PageLoadOptimizer
 import com.asforce.asforcebrowser.util.performance.PerformanceOptimizer
 import com.asforce.asforcebrowser.util.performance.ScrollOptimizer
+import com.asforce.asforcebrowser.util.performance.menu.MenuOptimizer
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -43,6 +44,7 @@ class WebViewFragment : Fragment() {
     private lateinit var scrollOptimizer: ScrollOptimizer
     private lateinit var mediaOptimizer: MediaOptimizer
     private lateinit var pageLoadOptimizer: PageLoadOptimizer
+    private lateinit var menuOptimizer: MenuOptimizer
 
     // WebViewClient - Sayfa yükleme ve URL değişimleri için
     private val webViewClient = object : WebViewClient() {
@@ -158,6 +160,7 @@ class WebViewFragment : Fragment() {
             scrollOptimizer = ScrollOptimizer(ctx)
             mediaOptimizer = MediaOptimizer(ctx)
             pageLoadOptimizer = PageLoadOptimizer(ctx)
+            menuOptimizer = MenuOptimizer(ctx)
         }
     }
 
@@ -222,6 +225,11 @@ class WebViewFragment : Fragment() {
                         // Sayfa yükleme optimizasyonlarını uygula
                         if (view != null) {
                             pageLoadOptimizer.optimizePageLoadSettings(view)
+                            
+                            // Erken menü optimizasyonu (sayfa yüklenirken)
+                            view.postDelayed({
+                                menuOptimizer.optimizeMenuPerformance(view)
+                            }, 200)
                         }
                     }
 
@@ -246,6 +254,14 @@ class WebViewFragment : Fragment() {
 
                             // Kodeck desteğini kontrol et ve optimize et
                             mediaOptimizer.enableAdvancedCodecSupport(view)
+                            
+                            // Menü optimizasyonlarını uygula
+                            menuOptimizer.applyMenuOptimizations(view)
+                            
+                            // Yavaş menü tepkisini düzelt
+                            view.postDelayed({
+                                menuOptimizer.fixSlowMenuResponse(view)
+                            }, 500)
                         }
                     }
 
