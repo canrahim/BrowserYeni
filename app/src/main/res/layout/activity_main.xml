@@ -178,6 +178,16 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- Arama Menüsü Container -->
+    <LinearLayout
+        android:id="@+id/searchMenuContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/appBarLayout" />
+
     <!-- İçerik Alanı - ViewPager2 -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
@@ -186,7 +196,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/appBarLayout" />
+        app:layout_constraintTop_toBottomOf="@+id/searchMenuContainer" />
 
     <!-- İlerleme Göstergesi -->
     <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -200,6 +210,6 @@
         app:trackThickness="3dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/appBarLayout" />
+        app:layout_constraintTop_toBottomOf="@+id/searchMenuContainer" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

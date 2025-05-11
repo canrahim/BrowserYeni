@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ComboBox Arama Menüsü Layout
+Sekmelerin altında görüntülenir ve dinamik olarak EditText eklenebilir
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/white"
+    android:padding="8dp"
+    android:id="@+id/searchMenuLayout"
+    android:visibility="gone">
+
+    <!-- Header Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@android:color/darker_gray"
+        android:padding="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="ComboBox Arama"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:paddingStart="8dp" />
+
+        <ImageButton
+            android:id="@+id/addSearchFieldButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_input_add"
+            android:background="@android:color/transparent"
+            android:tint="@android:color/white"
+            android:contentDescription="Arama alanı ekle" />
+
+        <ImageButton
+            android:id="@+id/searchButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_search_category_default"
+            android:background="@android:color/transparent"
+            android:tint="@android:color/white"
+            android:contentDescription="Ara" />
+
+        <ImageButton
+            android:id="@+id/toggleMenuButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/arrow_up_float"
+            android:background="@android:color/transparent"
+            android:tint="@android:color/white"
+            android:contentDescription="Menüyü gizle" />
+
+    </LinearLayout>
+
+    <!-- Search Fields Scroll Container -->
+    <ScrollView
+        android:id="@+id/searchFieldsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="150dp"
+        android:orientation="vertical"
+        android:layout_marginTop="4dp">
+
+        <LinearLayout
+            android:id="@+id/searchFieldsLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="4dp">
+
+            <!-- Initial search field -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <EditText
+                    android:id="@+id/searchField1"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:hint="Aranacak metin 1"
+                    android:inputType="text"
+                    android:background="@android:drawable/edit_text"
+                    android:padding="8dp"
+                    android:textSize="14sp" />
+
+                <ImageButton
+                    android:id="@+id/removeField1"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@android:drawable/ic_delete"
+                    android:background="@android:color/transparent"
+                    android:tint="@android:color/holo_red_dark"
+                    android:contentDescription="Bu alanı kaldır"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <!-- Results display section -->
+    <TextView
+        android:id="@+id/searchResultStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:textSize="12sp"
+        android:textColor="@android:color/darker_gray"
+        android:visibility="gone" />
+
+</LinearLayout>

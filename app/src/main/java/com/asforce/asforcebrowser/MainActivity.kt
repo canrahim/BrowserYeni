@@ -34,6 +34,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.asforce.asforcebrowser.util.DataHolder
 import android.widget.Toast
+import com.asforce.asforcebrowser.ui.search.SearchMenuManager
+import com.asforce.asforcebrowser.webview.ComboboxSearchHelper
+import android.os.Handler
+import android.os.Looper
 
 /**
  * MainActivity - Ana ekran
@@ -57,6 +61,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     private lateinit var viewPagerOptimizer: ViewPager2Optimizer
     private lateinit var downloadManager: DownloadManager
     private lateinit var webViewDownloadHelper: WebViewDownloadHelper
+    private lateinit var searchMenuManager: SearchMenuManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +77,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         }
 
         setupDownloadManager()
+        setupSearchMenu()
         setupAdapters()
         setupListeners()
         observeViewModel()
@@ -86,6 +92,21 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         
         // WebViewDownloadHelper'ı başlat
         webViewDownloadHelper = WebViewDownloadHelper(this)
+    }
+    
+    /**
+     * Arama menüsünü başlat ve konfigüre et
+     */
+    private fun setupSearchMenu() {
+        searchMenuManager = SearchMenuManager(
+            this,
+            binding.searchMenuContainer
+        )
+        
+        // Arama butonuna tıklandığında yapılacak işler
+        searchMenuManager.onSearchClick = { searchTexts ->
+            performComboBoxSearch(searchTexts)
+        }
     }
 
     private fun setupAdapters() {
@@ -240,8 +261,16 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         /**
          * Sol menü açma butonu dinleyicisi 
          * Menü itemleri: Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama, Termal Kamera
+         * Ayrıca arama menüsünü göster/gizle işlevi
          */
         binding.menuOpenButton.setOnClickListener { view ->
+            // Arama menüsünü toggle et
+            if (searchMenuManager.isVisible()) {
+                searchMenuManager.hideMenu()
+            } else {
+                searchMenuManager.showMenu()
+            }
+            // Sol menüyü de göster
             showLeftBrowserMenu(view)
         }
 
@@ -723,6 +752,256 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                 }
             }
         }
+    }
+    
+    /**
+     * ComboBox arama işlemini gerçekleştir
+     */
+    private fun performComboBoxSearch(searchTexts: List<String>) {
+        // Mevcut aktif tab'ı al
+        val currentTab = viewModel.activeTab.value ?: run {
+            Toast.makeText(this, "Aktif sekme bulunamadı", Toast.LENGTH_SHORT).show()
+            searchMenuManager.clearStatus()
+            return
+        }
+        
+        // Tab fragment'ını al
+        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: run {
+            Toast.makeText(this, "WebView bileşeni bulunamadı", Toast.LENGTH_SHORT).show()
+            searchMenuManager.clearStatus()
+            return
+        }
+        
+        // WebView bileşenini almak için fragment'ın doğrudansa WebView al
+        val webView = fragment.getWebView() ?: run {
+            Toast.makeText(this, "WebView yüklenemedi", Toast.LENGTH_SHORT).show()
+            searchMenuManager.clearStatus()
+            return
+        }
+        
+        // Önce webView'i TabWebView'e dönüştürmek gerekti
+        // İşlem başlatılıyor
+        searchMenuManager.showStatus("Arama başlatılıyor...")
+        
+        var searchIndex = 0
+        var totalMatches = 0
+        
+        // Sırayla arama yap
+        fun searchNext() {
+            if (searchIndex < searchTexts.size) {
+                val searchText = searchTexts[searchIndex]
+                searchMenuManager.showStatus("Aranan: $searchText")
+                
+                // JavaScript kodu ile WebView'de arama yap
+                val searchScript = """
+                    // ComboBox arama komut dizisi
+                    (function() {
+                        // Gelişmiş Türkçe karakter normalizasyonu
+                        function normalizeText(text) {
+                            if (!text) return '';
+                            
+                            // Önce küçük harfe çevir
+                            text = text.toLowerCase();
+                            
+                            // Türkçe karakter haritası - HEM büyük HEM küçük harfleri içeriyor
+                            var characterMap = {
+                                'ç': 'c', 'Ç': 'c',
+                                'ğ': 'g', 'Ğ': 'g',
+                                'ı': 'i', 'I': 'i',
+                                'İ': 'i', 'i': 'i',
+                                'ş': 's', 'Ş': 's',
+                                'ö': 'o', 'Ö': 'o',
+                                'ü': 'u', 'Ü': 'u'
+                            };
+                            
+                            // Tüm karakterleri değiştir
+                            var result = '';
+                            for (var i = 0; i < text.length; i++) {
+                                var char = text[i];
+                                result += characterMap[char] || char;
+                            }
+                            
+                            // Ek olarak Unicode normalizasyonu yap
+                            if (typeof result.normalize === 'function') {
+                                result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                            }
+                            
+                            return result;
+                        }
+                        
+                        // Arama fonksiyonunu tanımla
+                        function findAndSelectCombobox(searchText) {
+                            var found = false;
+                            var normalizedSearchText = normalizeText(searchText);
+                            console.log('Normalized search text: "' + normalizedSearchText + '"');
+                            
+                            // Standart select elementleri ara
+                            var selects = document.querySelectorAll('select');
+                            for (var i = 0; i < selects.length; i++) {
+                                var select = selects[i];
+                                if (select.disabled || !select.offsetParent) continue;
+                                
+                                for (var j = 0; j < select.options.length; j++) {
+                                    var option = select.options[j];
+                                    var optionText = option.text;
+                                    var normalizedOptionText = normalizeText(optionText);
+                                    
+                                    console.log('Comparing: "' + optionText + '" (normalized: "' + normalizedOptionText + '") with "' + searchText + '" (normalized: "' + normalizedSearchText + '")');
+                                    
+                                    // Tam eşleşme önce kontrol edilir
+                                    if (normalizedOptionText === normalizedSearchText) {
+                                        select.selectedIndex = j;
+                                        var event = new Event('change', { bubbles: true });
+                                        select.dispatchEvent(event);
+                                        select.scrollIntoView({behavior: 'smooth', block: 'center'});
+                                        found = true;
+                                        return {
+                                            found: true,
+                                            comboboxName: select.name || select.id || ('combobox_' + i),
+                                            selectedItem: optionText,
+                                            matchType: 'exact'
+                                        };
+                                    }
+                                    // Sonra kısmi eşleşme kontrol edilir
+                                    else if (normalizedOptionText.indexOf(normalizedSearchText) !== -1) {
+                                        select.selectedIndex = j;
+                                        var event = new Event('change', { bubbles: true });
+                                        select.dispatchEvent(event);
+                                        select.scrollIntoView({behavior: 'smooth', block: 'center'});
+                                        found = true;
+                                        return {
+                                            found: true,
+                                            comboboxName: select.name || select.id || ('combobox_' + i),
+                                            selectedItem: optionText,
+                                            matchType: 'partial'
+                                        };
+                                    }
+                                }
+                            }
+                            
+                            // Bootstrap select'ler ara
+                            var bootstrapSelects = document.querySelectorAll('.bootstrap-select');
+                            for (var i = 0; i < bootstrapSelects.length; i++) {
+                                var select = bootstrapSelects[i].querySelector('select');
+                                if (!select || select.disabled) continue;
+                                
+                                for (var j = 0; j < select.options.length; j++) {
+                                    var option = select.options[j];
+                                    var optionText = option.text;
+                                    var normalizedOptionText = normalizeText(optionText);
+                                    
+                                    // Tam eşleşme önce
+                                    if (normalizedOptionText === normalizedSearchText) {
+                                        select.selectedIndex = j;
+                                        var event = new Event('change', { bubbles: true });
+                                        select.dispatchEvent(event);
+                                        
+                                        if (typeof jQuery !== 'undefined') {
+                                            jQuery(select).selectpicker('val', option.value);
+                                            jQuery(select).selectpicker('refresh');
+                                        }
+                                        
+                                        bootstrapSelects[i].scrollIntoView({behavior: 'smooth', block: 'center'});
+                                        found = true;
+                                        return {
+                                            found: true,
+                                            comboboxName: select.name || select.id || ('bootstrap_' + i),
+                                            selectedItem: optionText,
+                                            matchType: 'exact'
+                                        };
+                                    }
+                                    // Kısmi eşleşme sonra
+                                    else if (normalizedOptionText.indexOf(normalizedSearchText) !== -1) {
+                                        select.selectedIndex = j;
+                                        var event = new Event('change', { bubbles: true });
+                                        select.dispatchEvent(event);
+                                        
+                                        if (typeof jQuery !== 'undefined') {
+                                            jQuery(select).selectpicker('val', option.value);
+                                            jQuery(select).selectpicker('refresh');
+                                        }
+                                        
+                                        bootstrapSelects[i].scrollIntoView({behavior: 'smooth', block: 'center'});
+                                        found = true;
+                                        return {
+                                            found: true,
+                                            comboboxName: select.name || select.id || ('bootstrap_' + i),
+                                            selectedItem: optionText,
+                                            matchType: 'partial'
+                                        };
+                                    }
+                                }
+                            }
+                            
+                            return {found: false};
+                        }
+                        
+                        // Arama yap ve sonucu döndür
+                        return findAndSelectCombobox('$searchText');
+                    })();
+                """.trimIndent()
+                
+                    // JavaScript'i çalıştır
+                    // WebView'i doğrudan kullanıyoruz çünkü TabWebView custom metodlarını içermiyor
+                    // Fragment'ın kendi getWebView metodunu kullanıyoruz
+                    webView.evaluateJavascript(searchScript) { result ->
+                    try {
+                        // JavaScript sonucunu işle
+                        val cleanResult = result.replace("\"", "").replace("\\\\", "\\")
+                        val jsonResult = org.json.JSONObject(cleanResult)
+                        val found = jsonResult.optBoolean("found", false)
+                        
+                        if (found) {
+                            totalMatches++
+                            val comboboxName = jsonResult.optString("comboboxName", "")
+                            val selectedItem = jsonResult.optString("selectedItem", "")
+                            val matchType = jsonResult.optString("matchType", "unknown")
+                            
+                            // Daha ayrıntılı başarı mesajı göster
+                            searchMenuManager.showStatus("Bulunan: $selectedItem (Tür: $matchType)")
+                            println("Eşleşme bulundu: \"$searchText\" -> \"$selectedItem\" (Tip: $matchType)")
+                        } else {
+                            searchMenuManager.showStatus("'$searchText' bulunamadı")
+                            println("Eşleşme bulunamadı: \"$searchText\"")
+                        }
+                        
+                        // Sonraki aramaya geç (gecikme ile)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            searchIndex++
+                            searchNext()
+                        }, 1000) // 1 saniye bekleme
+                        
+                    } catch (e: Exception) {
+                        searchMenuManager.showStatus("Arama hatası: ${e.message}")
+                        
+                        // Hata olsa da sonraki aramaya geç
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            searchIndex++
+                            searchNext()
+                        }, 1000)
+                    }
+                }
+            } else {
+                // Tüm aramalar tamamlandı
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (totalMatches > 0) {
+                        searchMenuManager.showStatus("Tamamlandı: $totalMatches eşleşme bulundu")
+                        Toast.makeText(this, "Toplam $totalMatches eşleşme bulundu", Toast.LENGTH_SHORT).show()
+                    } else {
+                        searchMenuManager.showStatus("Hiç eşleşme bulunamadı")
+                        Toast.makeText(this, "Hiç eşleşme bulunamadı", Toast.LENGTH_SHORT).show()
+                    }
+                    
+                    // 3 saniye sonra durumu temizle
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        searchMenuManager.clearStatus()
+                    }, 3000)
+                }, 500)
+            }
+        }
+        
+        // İlk aramayı başlat
+        searchNext()
     }
     
     override fun onDestroy() {
