@@ -221,11 +221,18 @@ class QRScannerDialog(
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         
         cameraProviderFuture.addListener({
-            // Kamera sağlayıcısını al
-            cameraProvider = cameraProviderFuture.get()
-            
-            // Kamerayı başlat
-            bindCameraUseCases()
+            try {
+                // Kamera sağlayıcısını al
+                cameraProvider = cameraProviderFuture.get()
+                
+                // Kamerayı başlat
+                bindCameraUseCases()
+                
+            } catch (e: Exception) {
+                Log.e("QRScanner", "Kamera başlatma hatası: ${e.message}")
+                Toast.makeText(context, "Kamera başlatılamadı: ${e.message}", Toast.LENGTH_SHORT).show()
+                dismiss()
+            }
             
         }, ContextCompat.getMainExecutor(context))
     }
@@ -237,30 +244,43 @@ class QRScannerDialog(
     private fun bindCameraUseCases() {
         val cameraProvider = cameraProvider ?: return
         
-        // Preview oluştur - basit versiyonu
-        preview = Preview.Builder()
-            .setTargetAspectRatio(AspectRatio.RATIO_16_9)
-            .build()
-            .also {
-                it.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
-            }
-        
-        // Image Analysis için analiz ayarları
-        imageAnalyzer = ImageAnalysis.Builder()
-            .setTargetResolution(Size(1280, 720))
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
-            .build()
-            .also {
-                it.setAnalyzer(cameraExecutor, advancedBarcodeAnalyzer)
-            }
-        
-        // Kamera seçimi (arka kamera) 
-        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-        
         try {
-            // Mevcut kamerayı kaldır
+            // Önceki tüm kullanım durumlarını kaldır
             cameraProvider.unbindAll()
+            
+            // QR tarama için optimize edilmiş barkod seçenekleri
+            val barcodeOptions = BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                    Barcode.FORMAT_QR_CODE,
+                    Barcode.FORMAT_AZTEC,
+                    Barcode.FORMAT_DATA_MATRIX
+                )
+                .enableAllPotentialBarcodes() // Tüm olası barkodlar için
+                .build()
+                
+            // Analyzer'a barkod seçeneklerini ayarla
+            advancedBarcodeAnalyzer.setBarcodeOptions(barcodeOptions)
+            
+            // Preview oluştur
+            preview = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_4_3) // Daha geniş görüş alanı için 4:3 oranı kullan
+                .build()
+                .also {
+                    it.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
+                }
+            
+            // Image Analysis için analiz ayarları
+            imageAnalyzer = ImageAnalysis.Builder()
+                .setTargetResolution(Size(1280, 720)) // Yüksek çözünürlük
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // En son görüntüyü analiz et
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888) // YUV formatı
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor, advancedBarcodeAnalyzer)
+                }
+            
+            // Kamera seçimi (arka kamera) 
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             
             // Kamera uygulamalarını bağla
             camera = cameraProvider.bindToLifecycle(
@@ -270,18 +290,26 @@ class QRScannerDialog(
                 imageAnalyzer
             )
             
-            // Zoom değerlerini ayarla
-            camera?.cameraInfo?.zoomState?.observe(context) { zoomState ->
-                currentZoomRatio = zoomState.zoomRatio
-            }
-            
-            // Kamera ayarları - basitleştirilmiş versiyon
-            camera?.cameraControl?.apply {
-                // Otomatik pozlama kompanzasyonu - hafif arttır
-                setExposureCompensationIndex(1)
+            // Kamera ayarları
+            camera?.let { cam ->
+                // Otomatik odaklama modunu ayarla
+                cam.cameraControl?.enableTorch(false) // Flash'i kapat
                 
-                // Flash başlangıçta kapalı
-                enableTorch(false)
+                // Otomatik odaklanma ayarı 
+                val meteringPoint = SurfaceOrientedMeteringPointFactory(1f, 1f)
+                    .createPoint(0.5f, 0.5f) // Merkeze odaklan
+                
+                val focusMeteringAction = FocusMeteringAction.Builder(meteringPoint)
+                    .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                
+                // Sürekli otomatik odaklanmayı etkinleştir
+                cam.cameraControl?.startFocusAndMetering(focusMeteringAction)
+                
+                // Zoom değerlerini ayarla
+                cam.cameraInfo?.zoomState?.observe(context) { zoomState ->
+                    currentZoomRatio = zoomState.zoomRatio
+                }
             }
             
             // Kamera başarıyla başlatıldı
@@ -289,10 +317,9 @@ class QRScannerDialog(
             
             // Işık durumunu periyodik olarak kontrol et
             startLightLevelChecking()
-            
         } catch (exc: Exception) {
-            Log.e("QRScanner", "Kamera başlatılamadı: ${exc.message}")
-            Toast.makeText(context, "Kamera başlatılamadı: ${exc.message}", Toast.LENGTH_SHORT).show()
+            Log.e("QRScanner", "Kamera özellikleri bağlanamadı: ${exc.message}")
+            Toast.makeText(context, "Kamera başlatılamadı. Lütfen tekrar deneyin.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -337,7 +364,10 @@ class QRScannerDialog(
         
         // QR Kod içeriğini al
         val rawValue = barcode.rawValue
-        if (rawValue != null) {
+        if (rawValue != null && rawValue.isNotEmpty()) {
+            // Log ekle - hata ayıklama için
+            Log.d("QRScanner", "QR Kod algılandı: $rawValue")
+            
             // Taramayı durdur
             isScanning = false
             lastScanTime = currentTime
@@ -369,6 +399,14 @@ class QRScannerDialog(
                 binding.root.postDelayed({
                     processScannedQR(rawValue)
                 }, 800)
+            }
+        } else {
+            // Boş QR kod içeriği - hata mesajı günlüğe yaz
+            Log.e("QRScanner", "QR Kod algılandı fakat içerik boş!")
+            
+            // Taramaya devam et
+            (context as? MainActivity)?.runOnUiThread {
+                binding.qrStatusText.text = "Tekrar deneyin..."
             }
         }
     }

@@ -748,13 +748,28 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         }
     }
 
-    private fun loadUrl(url: String) {
+    /**
+     * Verilen URL'yi yükler
+     * URL'yi normalize eder ve geçerli sekmede açar veya yeni sekme oluşturur
+     * 
+     * @param url Yüklenecek URL
+     * @param forceLoad URL zaten yüklü olsa bile zorla yeniden yükle
+     */
+    private fun loadUrl(url: String, forceLoad: Boolean = false) {
+        // URL'yi normalize et
+        val normalizedUrl = url.normalizeUrl()
+        
         val currentTab = viewModel.activeTab.value
         if (currentTab != null) {
-            pagerAdapter.getFragmentByTabId(currentTab.id)?.loadUrl(url)
+            val fragment = pagerAdapter.getFragmentByTabId(currentTab.id)
+            
+            // Eğer forceLoad seçeneği aktifse veya URL mevcut URL'den farklıysa yükle
+            if (forceLoad || fragment?.getWebView()?.url != normalizedUrl) {
+                fragment?.loadUrl(normalizedUrl)
+            }
         } else {
             // Eğer aktif sekme yoksa yeni bir sekme oluşturuyoruz
-            viewModel.createNewTab(url)
+            viewModel.createNewTab(normalizedUrl)
         }
     }
 
@@ -1962,23 +1977,41 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     
     /**
      * QR kod sonucunu işle
+     * Özellikle szutest.com.tr URL'leri için optimize edilmiştir
      */
     private fun processQrCodeResult(qrContent: String) {
-        // QR kodunu adres çubuğuna yaz
-        binding.addressBar.setText(qrContent)
-        
-        // Güvenli setSelection - adres çubuğu için
-        val textLength = binding.addressBar.text?.length ?: 0
-        val selectionEnd = minOf(qrContent.length, textLength)
-        if (selectionEnd >= 0 && selectionEnd <= textLength) {
-            binding.addressBar.setSelection(selectionEnd)
+        // Boş içerik kontrolü
+        if (qrContent.isBlank()) {
+            Toast.makeText(this, "QR kod boş veya okunamadı", Toast.LENGTH_SHORT).show()
+            return
         }
         
-        // Adres çubuğundaki değeri URL olarak yükle
-        loadUrl(qrContent)
+        // QR kodunun szutest.com.tr ile ilgili olup olmadığını kontrol et
+        val isSzutestUrl = qrContent.contains("szutest.com.tr", ignoreCase = true) ||
+                          qrContent.all { it.isDigit() } // Sayısal içerik de szutest için olabilir
+        
+        // Adres çubuğundaki değeri URL olarak yükle - force load parametresi ile
+        loadUrl(qrContent, true)
+        
+        // 500ms gecikme ile adres çubuğunu güncelle (sayfa yüklemesi başladıktan sonra)
+        Handler(Looper.getMainLooper()).postDelayed({
+            // QR kodunu adres çubuğuna yaz
+            binding.addressBar.setText(qrContent)
+            
+            // Güvenli setSelection - adres çubuğu için
+            val textLength = binding.addressBar.text?.length ?: 0
+            val selectionEnd = minOf(qrContent.length, textLength)
+            if (selectionEnd >= 0 && selectionEnd <= textLength) {
+                binding.addressBar.setSelection(selectionEnd)
+            }
+        }, 500)
         
         // Bilgi mesajı göster
-        Toast.makeText(this, "QR Kod tarandı, sayfa açılıyor...", Toast.LENGTH_SHORT).show()
+        if (isSzutestUrl) {
+            Toast.makeText(this, "Cihaz sayfası açılıyor...", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "QR Kod tarandı, sayfa açılıyor...", Toast.LENGTH_SHORT).show()
+        }
     }
     
     /**

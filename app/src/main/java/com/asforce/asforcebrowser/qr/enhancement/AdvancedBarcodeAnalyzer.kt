@@ -34,7 +34,7 @@ class AdvancedBarcodeAnalyzer(
     private val lowLightEnhancer = LowLightEnhancer(context)
 
     // ML Kit barcode scanner - yüksek doğrulukta tarama
-    private val highAccuracyScanner = BarcodeScanning.getClient(
+    private var highAccuracyScanner = BarcodeScanning.getClient(
         BarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
             .enableAllPotentialBarcodes() // Olası tüm barkodları etkinleştir
@@ -42,7 +42,7 @@ class AdvancedBarcodeAnalyzer(
     )
 
     // ML Kit barcode scanner - yüksek hızda tarama
-    private val highSpeedScanner = BarcodeScanning.getClient(
+    private var highSpeedScanner = BarcodeScanning.getClient(
         BarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
             .build()
@@ -58,6 +58,32 @@ class AdvancedBarcodeAnalyzer(
     // İşlem istatistikleri (debugging)
     private var lastProcessingStartTime = 0L
     private var processingTimes = mutableListOf<Long>()
+    
+    /**
+     * Barkod tarayıcı için seçenekleri ayarla
+     * 
+     * @param options Yeni barkod tarama seçenekleri
+     */
+    fun setBarcodeOptions(options: BarcodeScannerOptions) {
+        try {
+            // Mevcut tarayıcıları kapat
+            highAccuracyScanner.close()
+            highSpeedScanner.close()
+            
+            // Yeni tarayıcılar oluştur
+            highAccuracyScanner = BarcodeScanning.getClient(options)
+            
+            // Hızlı tarayıcı için sadece QR kodlarını destekleyen daha basit seçenekler
+            val speedOptions = BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                .build()
+            highSpeedScanner = BarcodeScanning.getClient(speedOptions)
+            
+            Log.d(TAG, "Barkod tarayıcı seçenekleri güncellendi")
+        } catch (e: Exception) {
+            Log.e(TAG, "Barkod tarayıcı seçenekleri güncellenirken hata: ${e.message}")
+        }
+    }
 
     @ExperimentalGetImage
     override fun analyze(imageProxy: ImageProxy) {
