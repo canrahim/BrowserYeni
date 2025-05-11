@@ -181,38 +181,18 @@ Referans: Android CameraX Documentation ve Material Dialog Design
 
         </LinearLayout>
 
-        <!-- Manual Input Option -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="0dp"
+            <android.widget.TextView
+                android:id="@+id/qr_result_preview"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="Elle giriş">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/manual_qr_input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textCapCharacters"
-                    android:singleLine="true" />
-
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_manual_submit"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_marginStart="8dp"
-                android:text="Gönder"
-                app:cornerRadius="4dp" />
-
-        </LinearLayout>
+                android:gravity="center"
+                android:text="Bulunan: -"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:background="#80000000"
+                android:padding="8dp"
+                android:layout_marginTop="16dp"
+                android:visibility="gone" />
 
     </LinearLayout>
 
