@@ -759,29 +759,22 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // JavaScript ile sayfa içeriğinde "Topraklama Tesisatı" ara
         val checkContentScript = """
             (function() {
-                console.log('Sayfa içeriği kontrol ediliyor...');
                 var content = document.documentElement.innerHTML.toLowerCase();
                 var found = content.indexOf('topraklama tesisat') !== -1 || content.indexOf('topraklama tesisatı') !== -1;
-                
-                console.log('Böylelikle: ' + found);
                 
                 if (found) {
                     // Daha spesifik kontrol: <p class="form-control-static">Topraklama Tesisatı</p>
                     var elements = document.querySelectorAll('p.form-control-static');
-                    console.log('p.form-control-static elementleri: ' + elements.length);
                     
                     for (var i = 0; i < elements.length; i++) {
                         var text = elements[i].textContent.trim().toLowerCase();
-                        console.log('Element ' + i + ' text: "' + text + '"');
                         
                         if (text === 'topraklama tesisatı') {
-                            console.log('BULUNDU: Topraklama Tesisatı spesifik olarak bulundu!');
                             return {found: true, specific: true};
                         }
                     }
                     
                     // Alternatif kontrol
-                    console.log('Özel format bulunamadı, genel kontrol yapılıyor...');
                     return {found: true, specific: false};
                 }
                 
@@ -905,7 +898,6 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                         function findAndSelectCombobox(searchText) {
                             var found = false;
                             var normalizedSearchText = normalizeText(searchText);
-                            console.log('Normalized search text: "' + normalizedSearchText + '"');
                             
                             // Standart select elementleri ara
                             var selects = document.querySelectorAll('select');
@@ -917,9 +909,6 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                                     var option = select.options[j];
                                     var optionText = option.text;
                                     var normalizedOptionText = normalizeText(optionText);
-                                    
-                                    console.log('Comparing: "' + optionText + '" (normalized: "' + normalizedOptionText + '") with "' + searchText + '" (normalized: "' + normalizedSearchText + '")');
-                                    
                                     // Tam eşleşme önce kontrol edilir
                                     if (normalizedOptionText === normalizedSearchText) {
                                         select.selectedIndex = j;
@@ -1041,7 +1030,6 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                         }, 1000) // 1 saniye bekleme
                         
                     } catch (e: Exception) {
-                        Toast.makeText(this@MainActivity, "Arama hatası: ${e.message}", Toast.LENGTH_SHORT).show()
                         
                         // Hata olsa da sonraki aramaya geç
                         Handler(Looper.getMainLooper()).postDelayed({
@@ -1055,9 +1043,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                 Handler(Looper.getMainLooper()).postDelayed({
                     searchButton.text = "Ara (${savedSearchTexts.size} metin)"
                     if (totalMatches > 0) {
-                        Toast.makeText(this@MainActivity, "Tamamlandı: $totalMatches eşleşme bulundu", Toast.LENGTH_SHORT).show()
+                       // Toast.makeText(this@MainActivity, "Tamamlandı: $totalMatches eşleşme bulundu", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(this@MainActivity, "Hiç eşleşme bulunamadı", Toast.LENGTH_SHORT).show()
+                        //Toast.makeText(this@MainActivity, "Hiç eşleşme bulunamadı", Toast.LENGTH_SHORT).show()
                     }
                 }, 500)
             }
