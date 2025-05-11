@@ -15,6 +15,9 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.camera.core.*
+// CameraX kapsamlı API'lar kaldırıldı
+// import androidx.camera.core.impl.CaptureRequestOptions
+// import androidx.camera.extensions.ExtendedCameraConfigOptions
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
@@ -26,6 +29,7 @@ import com.asforce.asforcebrowser.qr.enhancement.LowLightEnhancer
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
+import android.hardware.camera2.CaptureRequest
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -264,6 +268,7 @@ class QRScannerDialog(
             // Preview oluştur
             preview = Preview.Builder()
                 .setTargetAspectRatio(AspectRatio.RATIO_4_3) // Daha geniş görüş alanı için 4:3 oranı kullan
+                .setTargetRotation(binding.cameraPreview.display.rotation)
                 .build()
                 .also {
                     it.setSurfaceProvider(binding.cameraPreview.surfaceProvider)
@@ -271,9 +276,10 @@ class QRScannerDialog(
             
             // Image Analysis için analiz ayarları
             imageAnalyzer = ImageAnalysis.Builder()
-                .setTargetResolution(Size(1280, 720)) // Yüksek çözünürlük
+                .setTargetResolution(Size(1920, 1080)) // Yüksek çözünürlük için Full HD 
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // En son görüntüyü analiz et
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888) // YUV formatı
+                .setTargetRotation(binding.cameraPreview.display.rotation)
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor, advancedBarcodeAnalyzer)
@@ -295,21 +301,67 @@ class QRScannerDialog(
                 // Otomatik odaklama modunu ayarla
                 cam.cameraControl?.enableTorch(false) // Flash'i kapat
                 
-                // Otomatik odaklanma ayarı 
-                val meteringPoint = SurfaceOrientedMeteringPointFactory(1f, 1f)
-                    .createPoint(0.5f, 0.5f) // Merkeze odaklan
+                // Odaklama modünü sürekli otomatik odaklamaya ayarla
+                val factory = SurfaceOrientedMeteringPointFactory(1.0f, 1.0f)
                 
-                val focusMeteringAction = FocusMeteringAction.Builder(meteringPoint)
-                    .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
+                // Merkez nokta - geniş alanda odaklanma için birden çok nokta
+                val centerPoint = factory.createPoint(0.5f, 0.5f)  // Merkez
+                val topPoint = factory.createPoint(0.5f, 0.3f)     // Üst merkez
+                val bottomPoint = factory.createPoint(0.5f, 0.7f)  // Alt merkez
+                val leftPoint = factory.createPoint(0.3f, 0.5f)    // Sol merkez
+                val rightPoint = factory.createPoint(0.7f, 0.5f)   // Sağ merkez
                 
-                // Sürekli otomatik odaklanmayı etkinleştir
-                cam.cameraControl?.startFocusAndMetering(focusMeteringAction)
+                try {
+                    // Uzak mesafeler için geniş odaklanma alanı
+                    val action = FocusMeteringAction.Builder(centerPoint, FocusMeteringAction.FLAG_AF)
+                        .addPoint(topPoint, FocusMeteringAction.FLAG_AF)
+                        .addPoint(bottomPoint, FocusMeteringAction.FLAG_AF)
+                        .addPoint(leftPoint, FocusMeteringAction.FLAG_AF)
+                        .addPoint(rightPoint, FocusMeteringAction.FLAG_AF)
+                        .setAutoCancelDuration(2, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    
+                    // Sürekli odaklama talebini başlat
+                    cam.cameraControl?.startFocusAndMetering(action)
+                    
+                    // Kamera ayarlarına özel parametreler ekle
+                    // Uzak mesafede daha iyi odaklama için Camera2 Interop API'yi kullan
+                    try {
+                        // Camera2 Interop API ile kamera ayarları yapma
+                        // Not: CaptureRequestOptions ve ExtendedCameraConfigOptions sınıfları
+                        // artık desteklenmiyor. Camera2Interop API kullanılmalı.
+                        
+                        // Otomatik odaklama modunu ayarla
+                        cam.cameraControl.cancelFocusAndMetering()
+                        
+                        // Sürekli odaklama ve otomatik pozlama için gelişmiş bir FocusMeteringAction kullan
+                        val focusMeteringAction = FocusMeteringAction.Builder(centerPoint)
+                            .addPoint(topPoint, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                            .setAutoCancelDuration(5, java.util.concurrent.TimeUnit.SECONDS)
+                            .build()
+                            
+                        cam.cameraControl.startFocusAndMetering(focusMeteringAction)
+                    } catch (e: Exception) {
+                        Log.e("QRScanner", "Gelişmiş kamera ayarları yapılamadı: ${e.message}")
+                    }
+                } catch (e: Exception) {
+                    // 3A kontrolü desteği yoksa basit odaklama kullan
+                    Log.e("QRScanner", "Gelişmiş odaklama kontrolü başatılamadı: ${e.message}")
+                    
+                    val simpleAction = FocusMeteringAction.Builder(centerPoint)
+                        .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    
+                    cam.cameraControl?.startFocusAndMetering(simpleAction)
+                }
                 
-                // Zoom değerlerini ayarla
+                // Zoom değerlerini ayarla - başlangıçta hafif yakınlaştır
                 cam.cameraInfo?.zoomState?.observe(context) { zoomState ->
                     currentZoomRatio = zoomState.zoomRatio
                 }
+                
+                // Başlangıç zoom seviyesini hafif arttır (uzak QR kodlar için)
+                cam.cameraControl?.setZoomRatio(1.5f)
             }
             
             // Kamera başarıyla başlatıldı

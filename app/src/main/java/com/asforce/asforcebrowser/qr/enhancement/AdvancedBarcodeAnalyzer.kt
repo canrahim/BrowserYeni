@@ -36,7 +36,11 @@ class AdvancedBarcodeAnalyzer(
     // ML Kit barcode scanner - yüksek doğrulukta tarama
     private var highAccuracyScanner = BarcodeScanning.getClient(
         BarcodeScannerOptions.Builder()
-            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .setBarcodeFormats(
+                Barcode.FORMAT_QR_CODE,
+                Barcode.FORMAT_AZTEC,
+                Barcode.FORMAT_DATA_MATRIX
+            )
             .enableAllPotentialBarcodes() // Olası tüm barkodları etkinleştir
             .build()
     )
@@ -202,11 +206,16 @@ class AdvancedBarcodeAnalyzer(
     private fun evaluateBarcodeQuality(barcode: Barcode): Int {
         var qualityScore = 0
         
-        // 1. Barkod boyutunu değerlendir (daha büyük = daha iyi)
+        // 1. Barkod boyutunu değerlendir (daha büyük = daha iyi) - ama küçük QR kodlara da şans ver
         val boundingBox = barcode.boundingBox
         if (boundingBox != null) {
             val area = boundingBox.width() * boundingBox.height()
-            qualityScore += normalizeArea(area)
+            // Küçük alanlara da daha yüksek puan verelim (uzak mesafeden algılama için)
+            qualityScore += if (area < 500) {
+                60  // Küçük QR kodlar için bonus puan (uzaktan algılama)
+            } else {
+                normalizeArea(area)
+            }
         }
         
         // 2. Değerin varlığı ve uzunluğu
@@ -220,6 +229,11 @@ class AdvancedBarcodeAnalyzer(
         // 3. Biçim - QR kodu ise ek puan
         if (barcode.format == Barcode.FORMAT_QR_CODE) {
             qualityScore += 20
+        }
+        
+        // 4. Küçük QR kodlar için ek bonus puan (muhtemelen uzaktan algılanıyor)
+        if (boundingBox != null && boundingBox.width() * boundingBox.height() < 1000) {
+            qualityScore += 20  // Uzak mesafeden küçük QR kodlar için ek bonus
         }
         
         // Maksimum 100 ile sınırla
