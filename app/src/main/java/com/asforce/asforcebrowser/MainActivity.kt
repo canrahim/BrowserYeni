@@ -50,6 +50,13 @@ import org.json.JSONObject
 import org.json.JSONArray
 import android.view.inputmethod.InputMethodManager
 
+// QR Scanner bileşenleri
+import com.asforce.asforcebrowser.qr.QRScannerDialog
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+
 /**
  * MainActivity - Ana ekran
  * Tarayıcı uygulamasının ana aktivitesi, sekme yönetimi ve kullanıcı arayüzünü kontrol eder.
@@ -514,8 +521,14 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
 
         // QR Tarama butonu - QR kamera aktivitesini başlatır
         binding.btnQrScan.setOnClickListener {
-            // QR Tarama özelliği henüz uygulanmadı
-            Toast.makeText(this@MainActivity, "QR Tarama özelliği yakında...", Toast.LENGTH_SHORT).show()
+            // Kamera iznini kontrol et
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                // QR tarama dialog'unu göster
+                showQrScannerDialog()
+            } else {
+                // Kamera izni iste
+                requestCameraPermission()
+            }
         }
 
         // Uygulama ilk açıldığında menü görünürlüğünü ayarla
@@ -1666,13 +1679,23 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                     runOnUiThread {
                         // **QR edittext'i bulunan değerle güncelle**
                         qrSearchInput.setText(foundQrCode)
-                        qrSearchInput.setSelection(foundQrCode.length) // İmleci sona taşı
+                        
+                        // Güvenli setSelection
+                        val textLength = qrSearchInput.text?.length ?: 0
+                        val selectionEnd = minOf(foundQrCode.length, textLength)
+                        if (selectionEnd >= 0 && selectionEnd <= textLength) {
+                            qrSearchInput.setSelection(selectionEnd)
+                        }
                         
                         // Ek garantili güncelleme - görevini tamamladığından emin ol
                         Handler(Looper.getMainLooper()).postDelayed({
                             if (qrSearchInput.text.toString() != foundQrCode) {
                                 qrSearchInput.setText(foundQrCode)
-                                qrSearchInput.setSelection(foundQrCode.length)
+                                val newTextLength = qrSearchInput.text?.length ?: 0
+                                val newSelectionEnd = minOf(foundQrCode.length, newTextLength)
+                                if (newSelectionEnd >= 0 && newSelectionEnd <= newTextLength) {
+                                    qrSearchInput.setSelection(newSelectionEnd)
+                                }
                             }
                         }, 100)
                     }
@@ -1893,13 +1916,23 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                         runOnUiThread {
                             // **QR edittext'i bulunan değerle güncelle**
                             qrSearchInput.setText(foundQrCode)
-                            qrSearchInput.setSelection(foundQrCode.length) // İmleci sona taşı
+                            
+                            // Güvenli setSelection
+                            val textLength = qrSearchInput.text?.length ?: 0
+                            val selectionEnd = minOf(foundQrCode.length, textLength)
+                            if (selectionEnd >= 0 && selectionEnd <= textLength) {
+                                qrSearchInput.setSelection(selectionEnd)
+                            }
                             
                             // Ek garantili güncelleme - görevini tamamladığından emin ol
                             Handler(Looper.getMainLooper()).postDelayed({
                                 if (qrSearchInput.text.toString() != foundQrCode) {
                                     qrSearchInput.setText(foundQrCode)
-                                    qrSearchInput.setSelection(foundQrCode.length)
+                                    val newTextLength = qrSearchInput.text?.length ?: 0
+                                    val newSelectionEnd = minOf(foundQrCode.length, newTextLength)
+                                    if (newSelectionEnd >= 0 && newSelectionEnd <= newTextLength) {
+                                        qrSearchInput.setSelection(newSelectionEnd)
+                                    }
                                 }
                             }, 100)
                         }
@@ -1909,6 +1942,82 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                 // Hata durumunda sessizce devam et
             }
         }
+    }
+    
+    /**
+     * QR Tarama Dialog'unu göster
+     */
+    private fun showQrScannerDialog() {
+        QRScannerDialog.show(
+            context = this,
+            onQRCodeScanned = { qrContent ->
+                // QR kod içeriğini işle
+                processQrCodeResult(qrContent)
+            },
+            onDismiss = {
+                // Dialog kapatıldığında yapılacaklar (eğer gerekiyorsa)
+            }
+        )
+    }
+    
+    /**
+     * QR kod sonucunu işle
+     */
+    private fun processQrCodeResult(qrContent: String) {
+        // QR kodunu adres çubuğuna yaz
+        binding.addressBar.setText(qrContent)
+        
+        // Güvenli setSelection - adres çubuğu için
+        val textLength = binding.addressBar.text?.length ?: 0
+        val selectionEnd = minOf(qrContent.length, textLength)
+        if (selectionEnd >= 0 && selectionEnd <= textLength) {
+            binding.addressBar.setSelection(selectionEnd)
+        }
+        
+        // Adres çubuğundaki değeri URL olarak yükle
+        loadUrl(qrContent)
+        
+        // Bilgi mesajı göster
+        Toast.makeText(this, "QR Kod tarandı: $qrContent", Toast.LENGTH_SHORT).show()
+    }
+    
+    /**
+     * Kamera izni iste
+     */
+    private fun requestCameraPermission() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.CAMERA),
+            CAMERA_PERMISSION_REQUEST_CODE
+        )
+    }
+    
+    /**
+     * İzin sonucunu yönet
+     */
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        
+        when (requestCode) {
+            CAMERA_PERMISSION_REQUEST_CODE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // İzin verildi, QR tarama dialog'unu göster
+                    showQrScannerDialog()
+                } else {
+                    // İzin reddedildi
+                    Toast.makeText(this, "QR kod taramak için kamera izni gereklidir", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+    
+    companion object {
+        // Kamera izin kodu
+        private const val CAMERA_PERMISSION_REQUEST_CODE = 100
     }
     
     override fun onDestroy() {
