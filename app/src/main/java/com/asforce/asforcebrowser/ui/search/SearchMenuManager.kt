@@ -11,11 +11,12 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.graphics.Color
+import android.widget.Button
 import com.asforce.asforcebrowser.R
 
 /**
  * Arama menüsünü yöneten sınıf
- * Sekmelerin altında görünen arama menüsünü kontrol eder
+ * Sekmelerin altında sabit olarak görünen arama alanlarını kontrol eder
  * 
  * Referanslar:
  * - Android View System
@@ -28,10 +29,10 @@ class SearchMenuManager(
     private lateinit var menuLayout: View
     private lateinit var searchFieldsLayout: LinearLayout
     private lateinit var searchResultStatus: TextView
-    private lateinit var toggleButton: ImageButton
+    private lateinit var addSearchFieldButton: ImageButton
+    private lateinit var searchButton: Button
     
     private var searchFieldCount = 1
-    private var isMenuVisible = false
     
     // Arama işlemini gerçekleştirecek callback
     var onSearchClick: ((List<String>) -> Unit)? = null
@@ -54,7 +55,8 @@ class SearchMenuManager(
         // View referanslarını al
         searchFieldsLayout = menuLayout.findViewById(R.id.searchFieldsLayout)
         searchResultStatus = menuLayout.findViewById(R.id.searchResultStatus)
-        toggleButton = menuLayout.findViewById(R.id.toggleMenuButton)
+        addSearchFieldButton = menuLayout.findViewById(R.id.addSearchFieldButton)
+        searchButton = menuLayout.findViewById(R.id.searchButton)
         
         // Butonları ayarla
         setupButtons()
@@ -69,18 +71,13 @@ class SearchMenuManager(
      */
     private fun setupButtons() {
         // Arama alanı ekleme butonu
-        menuLayout.findViewById<ImageButton>(R.id.addSearchFieldButton).setOnClickListener {
+        addSearchFieldButton.setOnClickListener {
             addNewSearchField()
         }
         
         // Arama butonu
-        menuLayout.findViewById<ImageButton>(R.id.searchButton).setOnClickListener {
+        searchButton.setOnClickListener {
             performSearch()
-        }
-        
-        // Menü görünürlük butonu
-        toggleButton.setOnClickListener {
-            toggleMenuVisibility()
         }
     }
     
@@ -94,7 +91,7 @@ class SearchMenuManager(
         val fieldContainer = LinearLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                context.resources.getDimensionPixelSize(android.R.dimen.app_icon_size)
+                context.resources.getDimensionPixelSize(android.R.dimen.app_icon_size) - 8
             ).apply {
                 bottomMargin = 4
             }
@@ -112,22 +109,19 @@ class SearchMenuManager(
             hint = "Aranacak metin $searchFieldCount"
             inputType = InputType.TYPE_CLASS_TEXT
             setBackgroundResource(android.R.drawable.edit_text)
-            setPadding(16, 16, 16, 16)
-            textSize = 14f
+            setPadding(12, 12, 12, 12)
+            textSize = 13f
             tag = "searchField$searchFieldCount"
         }
         
-        // Silme butonu oluştur - Basit background kullan
+        // Silme butonu oluştur
         val removeButton = ImageButton(context).apply {
             layoutParams = LinearLayout.LayoutParams(
-                context.resources.getDimensionPixelSize(android.R.dimen.app_icon_size),
-                context.resources.getDimensionPixelSize(android.R.dimen.app_icon_size)
+                context.resources.getDimensionPixelSize(android.R.dimen.app_icon_size) - 8,
+                context.resources.getDimensionPixelSize(android.R.dimen.app_icon_size) - 8
             )
             setImageResource(android.R.drawable.ic_delete)
-            
-            // Basit seffaf arkplan kullan
             setBackgroundColor(Color.TRANSPARENT)
-            
             imageTintList = context.getColorStateList(android.R.color.holo_red_dark)
             contentDescription = "Bu alanı kaldır"
             
@@ -206,45 +200,6 @@ class SearchMenuManager(
     }
     
     /**
-     * Menüyü göster/gizle
-     */
-    private fun toggleMenuVisibility() {
-        isMenuVisible = !isMenuVisible
-        
-        if (isMenuVisible) {
-            showMenu()
-        } else {
-            hideMenu()
-        }
-    }
-    
-    /**
-     * Menüyü göster
-     */
-    fun showMenu() {
-        isMenuVisible = true
-        menuLayout.visibility = View.VISIBLE
-        toggleButton.setImageResource(android.R.drawable.arrow_up_float)
-        
-        // Sekmelerin altında yer açması için padding ekle
-        container.setPadding(
-            container.paddingLeft,
-            container.paddingTop,
-            container.paddingRight,
-            container.paddingBottom
-        )
-    }
-    
-    /**
-     * Menüyü gizle
-     */
-    fun hideMenu() {
-        isMenuVisible = false
-        menuLayout.visibility = View.GONE
-        toggleButton.setImageResource(android.R.drawable.arrow_down_float)
-    }
-    
-    /**
      * Durum mesajını göster
      */
     fun showStatus(message: String) {
@@ -260,7 +215,13 @@ class SearchMenuManager(
     }
     
     /**
-     * Menünün görünürlük durumunu döndür
+     * Menünün her zaman görünür olduğunu belirten metod
      */
-    fun isVisible(): Boolean = isMenuVisible
+    fun isVisible(): Boolean = true
+
+    /**
+     * Menü artık ayrı bir görünürlük durumuna sahip olmadığı için bu metodlar boş
+     */
+    fun showMenu() {} // Artık gerekli değil
+    fun hideMenu() {} // Artık gerekli değil
 }

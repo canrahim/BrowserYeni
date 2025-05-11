@@ -186,7 +186,11 @@
         android:orientation="vertical"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/appBarLayout" />
+        app:layout_constraintTop_toBottomOf="@+id/appBarLayout">
+        
+        <!-- Sadece arama butonu -->
+        <include layout="@layout/search_button_layout" />
+    </LinearLayout>
 
     <!-- İçerik Alanı - ViewPager2 -->
     <androidx.viewpager2.widget.ViewPager2

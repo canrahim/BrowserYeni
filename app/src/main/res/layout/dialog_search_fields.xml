@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Arama Alanları Dialog Layout
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- Dialog Title -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ComboBox Arama Alanları"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Search Fields Container -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="300dp">
+
+        <LinearLayout
+            android:id="@+id/searchFieldsLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Initial search field -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <EditText
+                    android:id="@+id/searchField1"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:hint="Aranacak metin 1"
+                    android:inputType="text"
+                    android:background="@android:drawable/edit_text"
+                    android:padding="12dp"
+                    android:textSize="14sp" />
+
+                <ImageButton
+                    android:id="@+id/removeField1"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@android:drawable/ic_delete"
+                    android:background="@android:color/transparent"
+                    android:tint="@android:color/holo_red_dark"
+                    android:contentDescription="Bu alanı kaldır"
+                    android:visibility="gone"
+                    android:layout_marginStart="8dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginTop="24dp">
+
+        <Button
+            android:id="@+id/addField"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Alan Ekle"
+            android:textSize="12sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="@android:color/darker_gray"
+            android:textColor="@android:color/white"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/clearAllFields"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Tümünü Temizle"
+            android:textSize="12sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="@android:color/holo_red_dark"
+            android:textColor="@android:color/white"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/cancelDialog"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="İptal"
+            android:textSize="12sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="@android:color/darker_gray"
+            android:textColor="@android:color/white"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/saveAndClose"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Kaydet ve Kapat"
+            android:textSize="12sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="@android:color/holo_green_dark"
+            android:textColor="@android:color/white" />
+
+    </LinearLayout>
+
+</LinearLayout>

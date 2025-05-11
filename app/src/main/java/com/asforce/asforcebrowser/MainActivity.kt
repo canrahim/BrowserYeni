@@ -34,10 +34,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.asforce.asforcebrowser.util.DataHolder
 import android.widget.Toast
-import com.asforce.asforcebrowser.ui.search.SearchMenuManager
+import com.asforce.asforcebrowser.ui.search.SearchDialog
 import com.asforce.asforcebrowser.webview.ComboboxSearchHelper
 import android.os.Handler
 import android.os.Looper
+import android.widget.Button
 
 /**
  * MainActivity - Ana ekran
@@ -61,7 +62,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     private lateinit var viewPagerOptimizer: ViewPager2Optimizer
     private lateinit var downloadManager: DownloadManager
     private lateinit var webViewDownloadHelper: WebViewDownloadHelper
-    private lateinit var searchMenuManager: SearchMenuManager
+    private lateinit var searchDialog: SearchDialog
+    private lateinit var searchButton: Button
+    private var savedSearchTexts = mutableListOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,7 +80,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         }
 
         setupDownloadManager()
-        setupSearchMenu()
+        setupSearchDialog()
         setupAdapters()
         setupListeners()
         observeViewModel()
@@ -95,17 +98,38 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     }
     
     /**
-     * Arama menüsünü başlat ve konfigüre et
+     * Arama dialog'unu başlat ve konfigüre et
      */
-    private fun setupSearchMenu() {
-        searchMenuManager = SearchMenuManager(
-            this,
-            binding.searchMenuContainer
-        )
+    private fun setupSearchDialog() {
+        // Search button'u bul
+        searchButton = findViewById(R.id.searchButton)
         
-        // Arama butonuna tıklandığında yapılacak işler
-        searchMenuManager.onSearchClick = { searchTexts ->
-            performComboBoxSearch(searchTexts)
+        // Search dialog'u oluştur
+        searchDialog = SearchDialog(this)
+        
+        // Dialog'da kaydet ve kapat butonuna basıldığında
+        searchDialog.onSaveAndClose = { searchTexts ->
+            savedSearchTexts.clear()
+            savedSearchTexts.addAll(searchTexts)
+            
+            // Eğer arama metinleri varsa, arama butonunu güncelle
+            if (searchTexts.isNotEmpty()) {
+                searchButton.text = "Ara (${searchTexts.size} metin)"
+            } else {
+                searchButton.text = "ComboBox Arama"
+            }
+        }
+        
+        // Search button'a tıklandığında
+        searchButton.setOnClickListener {
+            if (savedSearchTexts.isNotEmpty()) {
+                // Eğer arama metinleri varsa, direkt arama yap
+                performComboBoxSearch(savedSearchTexts)
+            } else {
+                // Arama metinleri yoksa, önce dialog'u göster
+                searchDialog.setSearchTexts(savedSearchTexts)
+                searchDialog.show()
+            }
         }
     }
 
@@ -261,16 +285,8 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         /**
          * Sol menü açma butonu dinleyicisi 
          * Menü itemleri: Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama, Termal Kamera
-         * Ayrıca arama menüsünü göster/gizle işlevi
          */
         binding.menuOpenButton.setOnClickListener { view ->
-            // Arama menüsünü toggle et
-            if (searchMenuManager.isVisible()) {
-                searchMenuManager.hideMenu()
-            } else {
-                searchMenuManager.showMenu()
-            }
-            // Sol menüyü de göster
             showLeftBrowserMenu(view)
         }
 
@@ -290,13 +306,14 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
 
     /**
      * Sol menü işlevi - Uygulama özellikleri
-     * Menü itemleri: Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama, Termal Kamera
+     * Menü itemleri: ComboBox Ara, Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama, Termal Kamera
      */
     private fun showLeftBrowserMenu(view: View) {
         val popupMenu = PopupMenu(this, view)
         
         // Uygulama özelliklerini ekle
         val items = arrayOf(
+            "ComboBox Arama Ayarları",
             "Kaçak Akım",
             "Pano Fonksiyon Kontrolü",
             "Topraklama",
@@ -310,19 +327,24 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
 
         popupMenu.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
-                0 -> { // Kaçak Akım
+                0 -> { // ComboBox Arama Ayarları
+                    searchDialog.setSearchTexts(savedSearchTexts)
+                    searchDialog.show()
+                    true
+                }
+                1 -> { // Kaçak Akım
                     handleKacakAkim()
                     true
                 }
-                1 -> { // Pano Fonksiyon Kontrolü
+                2 -> { // Pano Fonksiyon Kontrolü
                     handlePanoFonksiyonKontrol()
                     true
                 }
-                2 -> { // Topraklama
+                3 -> { // Topraklama
                     handleTopraklama()
                     true
                 }
-                3 -> { // Termal Kamera
+                4 -> { // Termal Kamera
                     handleTermalKamera()
                     true
                 }
@@ -761,27 +783,23 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // Mevcut aktif tab'ı al
         val currentTab = viewModel.activeTab.value ?: run {
             Toast.makeText(this, "Aktif sekme bulunamadı", Toast.LENGTH_SHORT).show()
-            searchMenuManager.clearStatus()
             return
         }
         
         // Tab fragment'ını al
         val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: run {
             Toast.makeText(this, "WebView bileşeni bulunamadı", Toast.LENGTH_SHORT).show()
-            searchMenuManager.clearStatus()
             return
         }
         
         // WebView bileşenini almak için fragment'ın doğrudansa WebView al
         val webView = fragment.getWebView() ?: run {
             Toast.makeText(this, "WebView yüklenemedi", Toast.LENGTH_SHORT).show()
-            searchMenuManager.clearStatus()
             return
         }
         
-        // Önce webView'i TabWebView'e dönüştürmek gerekti
-        // İşlem başlatılıyor
-        searchMenuManager.showStatus("Arama başlatılıyor...")
+        // Arama başlatılıyor
+        searchButton.text = "Aranıyor..."
         
         var searchIndex = 0
         var totalMatches = 0
@@ -790,7 +808,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         fun searchNext() {
             if (searchIndex < searchTexts.size) {
                 val searchText = searchTexts[searchIndex]
-                searchMenuManager.showStatus("Aranan: $searchText")
+                searchButton.text = "Aranan: $searchText"
                 
                 // JavaScript kodu ile WebView'de arama yap
                 val searchScript = """
@@ -941,10 +959,8 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                     })();
                 """.trimIndent()
                 
-                    // JavaScript'i çalıştır
-                    // WebView'i doğrudan kullanıyoruz çünkü TabWebView custom metodlarını içermiyor
-                    // Fragment'ın kendi getWebView metodunu kullanıyoruz
-                    webView.evaluateJavascript(searchScript) { result ->
+                // JavaScript'i çalıştır
+                webView.evaluateJavascript(searchScript) { result ->
                     try {
                         // JavaScript sonucunu işle
                         val cleanResult = result.replace("\"", "").replace("\\\\", "\\")
@@ -957,11 +973,10 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                             val selectedItem = jsonResult.optString("selectedItem", "")
                             val matchType = jsonResult.optString("matchType", "unknown")
                             
-                            // Daha ayrıntılı başarı mesajı göster
-                            searchMenuManager.showStatus("Bulunan: $selectedItem (Tür: $matchType)")
+                            // Buton durumunu güncelle
+                            searchButton.text = "Ara (${savedSearchTexts.size} metin)"
                             println("Eşleşme bulundu: \"$searchText\" -> \"$selectedItem\" (Tip: $matchType)")
                         } else {
-                            searchMenuManager.showStatus("'$searchText' bulunamadı")
                             println("Eşleşme bulunamadı: \"$searchText\"")
                         }
                         
@@ -972,7 +987,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                         }, 1000) // 1 saniye bekleme
                         
                     } catch (e: Exception) {
-                        searchMenuManager.showStatus("Arama hatası: ${e.message}")
+                        Toast.makeText(this@MainActivity, "Arama hatası: ${e.message}", Toast.LENGTH_SHORT).show()
                         
                         // Hata olsa da sonraki aramaya geç
                         Handler(Looper.getMainLooper()).postDelayed({
@@ -984,18 +999,12 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             } else {
                 // Tüm aramalar tamamlandı
                 Handler(Looper.getMainLooper()).postDelayed({
+                    searchButton.text = "Ara (${savedSearchTexts.size} metin)"
                     if (totalMatches > 0) {
-                        searchMenuManager.showStatus("Tamamlandı: $totalMatches eşleşme bulundu")
-                        Toast.makeText(this, "Toplam $totalMatches eşleşme bulundu", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Tamamlandı: $totalMatches eşleşme bulundu", Toast.LENGTH_SHORT).show()
                     } else {
-                        searchMenuManager.showStatus("Hiç eşleşme bulunamadı")
-                        Toast.makeText(this, "Hiç eşleşme bulunamadı", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "Hiç eşleşme bulunamadı", Toast.LENGTH_SHORT).show()
                     }
-                    
-                    // 3 saniye sonra durumu temizle
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        searchMenuManager.clearStatus()
-                    }, 3000)
                 }, 500)
             }
         }
