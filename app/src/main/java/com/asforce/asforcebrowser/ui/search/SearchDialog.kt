@@ -2,6 +2,7 @@ package com.asforce.asforcebrowser.ui.search
 
 import android.app.Dialog
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.text.InputType
 import android.view.LayoutInflater
@@ -15,6 +16,7 @@ import com.google.android.material.textfield.TextInputEditText
 import android.widget.LinearLayout
 import android.widget.Toast
 import com.asforce.asforcebrowser.R
+import org.json.JSONArray
 
 /**
  * Arama alanlarını yöneten dialog sınıfı
@@ -29,6 +31,23 @@ class SearchDialog(private val context: Context) {
     
     // Kaydet ve kapat butonuna basıldığında çağrılacak callback
     var onSaveAndClose: ((List<String>) -> Unit)? = null
+    
+    // SharedPreferences için
+    private val sharedPreferences: SharedPreferences = context.getSharedPreferences(
+        "SearchDialogPrefs", 
+        Context.MODE_PRIVATE
+    )
+    
+    // SharedPreferences key'leri
+    private companion object {
+        const val KEY_SEARCH_TEXTS = "search_texts"
+        const val KEY_SEARCH_COUNT = "search_count"
+    }
+    
+    // Sinif örneği oluşturulduğunda SharedPreferences'dan veri yükle
+    init {
+        loadSearchTextsFromSharedPreferences()
+    }
     
     /**
      * Dialog'u oluştur ve göster
@@ -263,6 +282,9 @@ class SearchDialog(private val context: Context) {
         searchTexts.clear()
         searchTexts.addAll(texts)
         
+        // SharedPreferences'a kaydet
+        saveSearchTextsToSharedPreferences(texts)
+        
         // Callback'i çağır
         onSaveAndClose?.invoke(texts)
         
@@ -293,5 +315,64 @@ class SearchDialog(private val context: Context) {
      */
     fun getSearchTexts(): List<String> {
         return searchTexts.toList()
+    }
+    
+    /**
+     * SharedPreferences'dan arama metinlerini yükle
+     */
+    private fun loadSearchTextsFromSharedPreferences() {
+        try {
+            val savedTexts = sharedPreferences.getString(KEY_SEARCH_TEXTS, "[]")
+            val jsonArray = JSONArray(savedTexts)
+            
+            searchTexts.clear()
+            for (i in 0 until jsonArray.length()) {
+                val text = jsonArray.getString(i)
+                if (text.isNotEmpty()) {
+                    searchTexts.add(text)
+                }
+            }
+            
+            searchFieldCount = sharedPreferences.getInt(KEY_SEARCH_COUNT, 1)
+        } catch (e: Exception) {
+            // Hata durumunda varsayılan değerler
+            searchTexts.clear()
+            searchFieldCount = 1
+        }
+    }
+    
+    /**
+     * Arama metinlerini SharedPreferences'a kaydet
+     */
+    private fun saveSearchTextsToSharedPreferences(texts: List<String>) {
+        try {
+            // Sadece boş olmayan metinleri kaydet
+            val validTexts = texts.filter { it.isNotEmpty() }
+            
+            // Boş liste ise kaydetme
+            if (validTexts.isEmpty()) {
+                // Mevcut kayıtları sil
+                sharedPreferences.edit()
+                    .remove(KEY_SEARCH_TEXTS)
+                    .remove(KEY_SEARCH_COUNT)
+                    .apply()
+                return
+            }
+            
+            // JSON array'e dönüştür
+            val jsonArray = JSONArray()
+            validTexts.forEach { text ->
+                jsonArray.put(text)
+            }
+            
+            // SharedPreferences'a kaydet
+            sharedPreferences.edit()
+                .putString(KEY_SEARCH_TEXTS, jsonArray.toString())
+                .putInt(KEY_SEARCH_COUNT, validTexts.size + 1)
+                .apply()
+        } catch (e: Exception) {
+            // Hata durumunu logla
+            e.printStackTrace()
+        }
     }
 }

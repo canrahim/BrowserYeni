@@ -32,6 +32,8 @@ import com.asforce.asforcebrowser.ui.panel.kotlin.PanelControlActivity
 import com.asforce.asforcebrowser.ui.topraklama.kotlin.TopraklamaControlActivity
 import com.asforce.asforcebrowser.ui.termal.kotlin.Menu4Activity
 import android.content.Intent
+import android.content.SharedPreferences
+import android.content.Context
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -68,6 +70,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     private lateinit var searchDialog: SearchDialog
     private lateinit var searchButton: Button
     private var savedSearchTexts = mutableListOf<String>()
+    
+    // SharedPreferences için
+    private lateinit var sharedPreferences: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,6 +96,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         insetsController.isAppearanceLightStatusBars = isLightMode
         // Navigasyon çubuğu metin rengini ayarla
         insetsController.isAppearanceLightNavigationBars = isLightMode
+        
+        // SharedPreferences'i başlat
+        sharedPreferences = getSharedPreferences("SearchDialogPrefs", Context.MODE_PRIVATE)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -126,8 +134,19 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // Search button'u bul
         searchButton = findViewById(R.id.searchButton)
         
-        // Search dialog'u oluştur
+        // Search dialog'u oluştur - SharedPreferences'dan veri otomatik yüklenecek
         searchDialog = SearchDialog(this)
+        
+        // SearchDialog'daki arama metinlerini al
+        savedSearchTexts.clear()
+        savedSearchTexts.addAll(searchDialog.getSearchTexts())
+        
+        // Eğer arama metinleri varsa, arama butonunu güncelle
+        if (savedSearchTexts.isNotEmpty()) {
+            searchButton.text = "Ara (${savedSearchTexts.size} metin)"
+        } else {
+            searchButton.text = "ComboBox Arama"
+        }
         
         // Dialog'da kaydet ve kapat butonuna basıldığında
         searchDialog.onSaveAndClose = { searchTexts ->
