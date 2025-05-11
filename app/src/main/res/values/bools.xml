@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Boolean değerler
+Referans: Android Resource Documentation
+-->
+<resources>
+    <!-- Açık modda durum çubuğu renklendirmesi -->
+    <bool name="light_status_bar">true</bool>
+    <bool name="light_navigation_bar">true</bool>
+</resources>

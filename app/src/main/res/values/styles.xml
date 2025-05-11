@@ -21,4 +21,20 @@
         <item name="android:background">@color/addressBarBackground</item>
         <item name="android:padding">8dp</item>
     </style>
+    
+    <!-- Modern şekilli butonlar için stil -->
+    <style name="RoundedButtonStyle" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">24dp</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+    
+    <!-- Yuvarlatılmış köşeli TextInputLayout stili -->
+    <style name="RoundedTextInputLayoutStyle" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
+    </style>
 </resources>

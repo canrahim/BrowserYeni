@@ -1,22 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-Arama Alanları Dialog Layout
+Arama Alanları Dialog Layout - Modern ve Karanlık Mod Uyumlu (Material 2 Uyumlu)
+Referans: Material Design Guidelines 2.0, Google Material Theme
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:background="@color/card_background">
 
     <!-- Dialog Title -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="ComboBox Arama Alanları"
-        android:textSize="18sp"
+        android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="@android:color/black"
-        android:layout_marginBottom="16dp" />
+        android:textColor="@color/text_primary"
+        android:layout_marginBottom="24dp" />
 
     <!-- Search Fields Container -->
     <ScrollView
@@ -28,34 +31,47 @@ Arama Alanları Dialog Layout
             android:id="@+id/searchFieldsLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
 
             <!-- Initial search field -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="12dp">
 
-                <EditText
-                    android:id="@+id/searchField1"
+                <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:hint="Aranacak metin 1"
-                    android:inputType="text"
-                    android:background="@android:drawable/edit_text"
-                    android:padding="12dp"
-                    android:textSize="14sp" />
+                    app:hintTextColor="@color/colorPrimary"
+                    app:boxStrokeColor="@color/colorPrimary">
 
-                <ImageButton
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/searchField1"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textSize="16sp"
+                        android:textColor="@color/text_primary"
+                        android:paddingTop="16dp"
+                        android:paddingBottom="16dp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/removeField1"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@android:drawable/ic_delete"
-                    android:background="@android:color/transparent"
-                    android:tint="@android:color/holo_red_dark"
+                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    app:icon="@drawable/ic_delete"
+                    app:iconTint="#F44336"
+                    app:backgroundTint="@android:color/transparent"
                     android:contentDescription="Bu alanı kaldır"
                     android:visibility="gone"
                     android:layout_marginStart="8dp" />
@@ -72,54 +88,58 @@ Arama Alanları Dialog Layout
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="end"
-        android:layout_marginTop="24dp">
+        android:layout_marginTop="32dp">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/addField"
+            style="@style/Widget.MaterialComponents.Button"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="48dp"
             android:text="Alan Ekle"
-            android:textSize="12sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:background="@android:color/darker_gray"
-            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            app:icon="@drawable/ic_add"
+            app:iconGravity="textStart"
+            app:cornerRadius="24dp"
             android:layout_marginEnd="8dp" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/clearAllFields"
+            style="@style/Widget.MaterialComponents.Button"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="48dp"
             android:text="Tümünü Temizle"
-            android:textSize="12sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:background="@android:color/holo_red_dark"
-            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            app:icon="@drawable/ic_clear_all"
+            app:iconGravity="textStart"
+            app:backgroundTint="#F44336"
+            app:iconTint="#FFFFFF"
+            android:textColor="#FFFFFF"
+            app:cornerRadius="24dp"
             android:layout_marginEnd="8dp" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/cancelDialog"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="48dp"
             android:text="İptal"
-            android:textSize="12sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:background="@android:color/darker_gray"
-            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            app:cornerRadius="24dp"
             android:layout_marginEnd="8dp" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/saveAndClose"
+            style="@style/Widget.MaterialComponents.Button"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="48dp"
             android:text="Kaydet ve Kapat"
-            android:textSize="12sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:background="@android:color/holo_green_dark"
-            android:textColor="@android:color/white" />
+            android:textSize="14sp"
+            app:icon="@drawable/ic_save"
+            app:iconGravity="textStart"
+            app:backgroundTint="@color/colorPrimary"
+            android:textColor="@color/white"
+            app:iconTint="@color/white"
+            app:cornerRadius="24dp" />
 
     </LinearLayout>
 

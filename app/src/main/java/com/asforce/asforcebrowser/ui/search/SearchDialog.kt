@@ -7,9 +7,11 @@ import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
+// Button artık MaterialButton ile değiştirildi
 import android.widget.EditText
-import android.widget.ImageButton
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.textfield.TextInputEditText
 import android.widget.LinearLayout
 import android.widget.Toast
 import com.asforce.asforcebrowser.R
@@ -40,10 +42,10 @@ class SearchDialog(private val context: Context) {
         
         // View referanslarını al
         searchFieldsLayout = dialog.findViewById(R.id.searchFieldsLayout)
-        val addFieldButton = dialog.findViewById<Button>(R.id.addField)
-        val clearAllButton = dialog.findViewById<Button>(R.id.clearAllFields)
-        val cancelButton = dialog.findViewById<Button>(R.id.cancelDialog)
-        val saveButton = dialog.findViewById<Button>(R.id.saveAndClose)
+        val addFieldButton = dialog.findViewById<MaterialButton>(R.id.addField)
+        val clearAllButton = dialog.findViewById<MaterialButton>(R.id.clearAllFields)
+        val cancelButton = dialog.findViewById<MaterialButton>(R.id.cancelDialog)
+        val saveButton = dialog.findViewById<MaterialButton>(R.id.saveAndClose)
         
         // Buton dinleyicilerini ayarla
         addFieldButton.setOnClickListener {
@@ -64,7 +66,7 @@ class SearchDialog(private val context: Context) {
         }
         
         // İlk alanın silme butonunu ayarla
-        val removeButton = dialog.findViewById<ImageButton>(R.id.removeField1)
+        val removeButton = dialog.findViewById<MaterialButton>(R.id.removeField1)
         removeButton.visibility = View.GONE
         
         // Mevcut arama metinlerini yükle
@@ -82,16 +84,24 @@ class SearchDialog(private val context: Context) {
         for (i in 0 until searchTexts.size) {
             if (i == 0) {
                 // İlk alan zaten var, sadece metni ayarla
-                val firstField = dialog?.findViewById<EditText>(R.id.searchField1)
-                firstField?.setText(searchTexts[i])
+                // İlk alan TextInputLayout içinde olduğundan, ona göre erişelim
+                val firstLayout = searchFieldsLayout.getChildAt(0) as? LinearLayout
+                if (firstLayout != null) {
+                    val firstTextInputLayout = firstLayout.getChildAt(0) as? TextInputLayout
+                    // TextInputLayout'un getEditText() metodunu kullan
+                    val firstField = firstTextInputLayout?.editText
+                    firstField?.setText(searchTexts[i])
+                }
             } else {
                 // Yeni alan ekle
                 addNewSearchField()
                 val layouts = searchFieldsLayout.childCount
                 if (layouts > i) {
                     val layout = searchFieldsLayout.getChildAt(i) as LinearLayout
-                    val editText = layout.getChildAt(0) as EditText
-                    editText.setText(searchTexts[i])
+                    val textInputLayout = layout.getChildAt(0) as TextInputLayout
+                    // TextInputLayout'un getEditText() metodunu kullan
+                    val editText = textInputLayout.editText
+                    editText?.setText(searchTexts[i])
                 }
             }
         }
@@ -107,38 +117,53 @@ class SearchDialog(private val context: Context) {
         val fieldContainer = LinearLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                48
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin = 8
+                bottomMargin = 12
             }
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
         }
         
-        // EditText oluştur
-        val editText = EditText(context).apply {
+        // TextInputLayout oluştur
+        val textInputLayout = TextInputLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
             hint = "Aranacak metin $searchFieldCount"
-            inputType = InputType.TYPE_CLASS_TEXT
-            setBackgroundResource(android.R.drawable.edit_text)
-            setPadding(12, 12, 12, 12)
-            textSize = 14f
-            tag = "searchField$searchFieldCount"
+            
+            // XML'deki stilı uygula
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            hintTextColor = context.getColorStateList(R.color.colorPrimary)
+            boxStrokeColor = context.resources.getColor(R.color.colorPrimary)
         }
         
-        // Silme butonu oluştur
-        val removeButton = ImageButton(context).apply {
-            layoutParams = LinearLayout.LayoutParams(40, 40).apply {
+        // TextInputEditText oluştur
+        val editText = TextInputEditText(context).apply {
+            inputType = InputType.TYPE_CLASS_TEXT
+            textSize = 16f
+            tag = "searchField$searchFieldCount"
+            setTextColor(context.resources.getColor(R.color.text_primary))
+            setPadding(16, 16, 16, 16)
+        }
+        
+        // EditText'i TextInputLayout'a ekle
+        textInputLayout.addView(editText)
+        
+        // Silme butonu oluştur - MaterialButton kullanarak
+        val removeButton = MaterialButton(context).apply {
+            layoutParams = LinearLayout.LayoutParams(48, 48).apply {
                 marginStart = 8
             }
-            setImageResource(android.R.drawable.ic_delete)
+            setIcon(context.getDrawable(R.drawable.ic_delete))
+            setIconTint(context.getColorStateList(android.R.color.holo_red_dark))
             setBackgroundColor(Color.TRANSPARENT)
-            imageTintList = context.getColorStateList(android.R.color.holo_red_dark)
             contentDescription = "Bu alanı kaldır"
+            
+            // MaterialButton'un default padding'ini kısaltmak için
+            setPadding(0, 0, 0, 0)
             
             setOnClickListener {
                 removeSearchField(fieldContainer)
@@ -146,7 +171,7 @@ class SearchDialog(private val context: Context) {
         }
         
         // View'leri container'a ekle
-        fieldContainer.addView(editText)
+        fieldContainer.addView(textInputLayout)
         fieldContainer.addView(removeButton)
         
         // Ana layout'a ekle
@@ -154,7 +179,7 @@ class SearchDialog(private val context: Context) {
         
         // İlk alanın silme butonunu göster (2. alan eklendikten sonra)
         if (searchFieldCount == 2) {
-            dialog?.findViewById<ImageButton>(R.id.removeField1)?.visibility = View.VISIBLE
+            dialog?.findViewById<MaterialButton>(R.id.removeField1)?.visibility = View.VISIBLE
         }
     }
     
@@ -167,7 +192,7 @@ class SearchDialog(private val context: Context) {
         
         // Eğer sadece bir alan kaldıysa silme butonunu gizle
         if (searchFieldCount == 1) {
-            dialog?.findViewById<ImageButton>(R.id.removeField1)?.visibility = View.GONE
+            dialog?.findViewById<MaterialButton>(R.id.removeField1)?.visibility = View.GONE
         }
         
         // Alan numaralarını yeniden düzenle
@@ -181,9 +206,13 @@ class SearchDialog(private val context: Context) {
         var count = 1
         for (i in 0 until searchFieldsLayout.childCount) {
             val container = searchFieldsLayout.getChildAt(i) as LinearLayout
-            val editText = container.getChildAt(0) as EditText
-            editText.hint = "Aranacak metin $count"
-            editText.tag = "searchField$count"
+            val textInputLayout = container.getChildAt(0) as TextInputLayout
+            
+            // Hint'i TextInputLayout üzerinden güncelleyelim
+            textInputLayout.hint = "Aranacak metin $count"
+            // TextInputLayout'un getEditText() metodunu kullanarak EditText'e erişelim
+            val editText = textInputLayout.editText
+            editText?.tag = "searchField$count"
             count++
         }
     }
@@ -193,7 +222,13 @@ class SearchDialog(private val context: Context) {
      */
     private fun clearAllFields() {
         // İlk alanı boşalt
-        dialog?.findViewById<EditText>(R.id.searchField1)?.setText("")
+        val firstLayout = searchFieldsLayout.getChildAt(0) as? LinearLayout
+        if (firstLayout != null) {
+            val firstTextInputLayout = firstLayout.getChildAt(0) as? TextInputLayout
+            // TextInputLayout'un getEditText() metodunu kullan
+            val firstField = firstTextInputLayout?.editText
+            firstField?.setText("")
+        }
         
         // Diğer tüm alanları kaldır
         val childCount = searchFieldsLayout.childCount
@@ -202,7 +237,7 @@ class SearchDialog(private val context: Context) {
         }
         
         searchFieldCount = 1
-        dialog?.findViewById<ImageButton>(R.id.removeField1)?.visibility = View.GONE
+        dialog?.findViewById<MaterialButton>(R.id.removeField1)?.visibility = View.GONE
     }
     
     /**
@@ -214,8 +249,10 @@ class SearchDialog(private val context: Context) {
         // Tüm alanlardan metinleri topla
         for (i in 0 until searchFieldsLayout.childCount) {
             val container = searchFieldsLayout.getChildAt(i) as LinearLayout
-            val editText = container.getChildAt(0) as EditText
-            val text = editText.text.toString().trim()
+            val textInputLayout = container.getChildAt(0) as TextInputLayout
+            // TextInputLayout'un getEditText() metodunu kullan
+            val editText = textInputLayout.editText
+            val text = editText?.text?.toString()?.trim() ?: ""
             
             if (text.isNotEmpty()) {
                 texts.add(text)

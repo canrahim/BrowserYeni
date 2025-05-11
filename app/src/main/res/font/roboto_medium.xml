@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Roboto Medium Font Ailesi Tanımı
+Referans: Android Font Documentation
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="500"
+        android:font="@font/roboto_medium_regular" />
+</font-family>

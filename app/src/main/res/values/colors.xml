@@ -1,10 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+Renk tanımları - Karanlık Mod Uyumlu
+Referans: Material Design 3 Color System, Material Theme Builder
+-->
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     
-    <!-- Ana tema renkleri -->
+    <!-- Material Design 3 Ana Renkler - Açık Mod -->
     <color name="colorPrimary">#4285F4</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    <color name="colorPrimaryContainer">#E3F2FD</color>
+    <color name="colorOnPrimaryContainer">#001E3A</color>
+    
+    <!-- Yüzey Renkleri - Açık Mod -->
+    <color name="colorSurface">#FFFBFE</color>
+    <color name="colorOnSurface">#1C1B1F</color>
+    <color name="colorSurfaceVariant">#E7E0EC</color>
+    <color name="colorOnSurfaceVariant">#49454F</color>
+    
+    <!-- Hata Renkleri -->
+    <color name="colorError">#B3261E</color>
+    <color name="colorOnError">#FFFFFF</color>
+    <color name="colorErrorContainer">#F9DEDC</color>
+    <color name="colorOnErrorContainer">#410E0B</color>
+    
+    <!-- Arka Plan Renkleri - Açık Mod -->
+    <color name="colorBackground">#FFFBFE</color>
+    <color name="colorOnBackground">#1C1B1F</color>
+    
+    <!-- Eski tema renkleri (geriye uyumluluk için) -->
     <color name="colorPrimaryDark">#3367D6</color>
     <color name="colorAccent">#8AB4F8</color>
     

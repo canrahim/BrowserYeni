@@ -1,6 +1,7 @@
 package com.asforce.asforcebrowser
 
 import android.os.Bundle
+import android.content.res.Configuration
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -9,6 +10,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -69,6 +72,25 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Durum çubuğu ve navigasyon çubuğu renkleri için modern API kullan
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
+        // Durum çubuğu ve navigasyon çubuğu renklerini ayarla
+        window.statusBarColor = getColor(R.color.colorSurface)
+        window.navigationBarColor = getColor(R.color.colorSurface)
+        
+        // Modern WindowInsetsController kullanarak metin/ikon renklerini ayarla
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        
+        // Karanlık mod kontrolü
+        val uiMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val isLightMode = uiMode != Configuration.UI_MODE_NIGHT_YES
+        
+        // Durum çubuğu metin rengini ayarla (true: koyu metin, false: beyaz metin)
+        insetsController.isAppearanceLightStatusBars = isLightMode
+        // Navigasyon çubuğu metin rengini ayarla
+        insetsController.isAppearanceLightNavigationBars = isLightMode
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -534,6 +556,19 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
      */
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
+        
+        // Tema değişikliğinde sistem çubuğu renklerini güncelle
+        val uiMode = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val isLightMode = uiMode != Configuration.UI_MODE_NIGHT_YES
+        
+        // Durum çubuğu ve navigasyon çubuğu renklerini güncelle
+        window.statusBarColor = getColor(R.color.colorSurface)
+        window.navigationBarColor = getColor(R.color.colorSurface)
+        
+        // Windows Insets Controller ile metin renklerini güncelle
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.isAppearanceLightStatusBars = isLightMode
+        insetsController.isAppearanceLightNavigationBars = isLightMode
 
         // Şu anki fragmanların durumlarını kaydet
         saveCurrentFragmentState()

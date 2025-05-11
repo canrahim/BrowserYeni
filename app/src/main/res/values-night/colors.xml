@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Karanlık Mod Renk Tanımları
+Referans: Material Design 3 Dark Theme, Material Color System
+-->
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Material Design 3 Ana Renkler - Karanlık Mod -->
+    <color name="colorPrimary">#A8C7FA</color>
+    <color name="colorOnPrimary">#00325B</color>
+    <color name="colorPrimaryContainer">#004881</color>
+    <color name="colorOnPrimaryContainer">#D7E3FF</color>
+    
+    <!-- Yüzey Renkleri - Karanlık Mod -->
+    <color name="colorSurface">#14131C</color>
+    <color name="colorOnSurface">#E4E1E6</color>
+    <color name="colorSurfaceVariant">#46464F</color>
+    <color name="colorOnSurfaceVariant">#C7C5D0</color>
+    
+    <!-- Hata Renkleri - Karanlık Mod -->
+    <color name="colorError">#FFB4AB</color>
+    <color name="colorOnError">#690005</color>
+    <color name="colorErrorContainer">#93000A</color>
+    <color name="colorOnErrorContainer">#FFDAD6</color>
+    
+    <!-- Arka Plan Renkleri - Karanlık Mod -->
+    <color name="colorBackground">#14131C</color>
+    <color name="colorOnBackground">#E4E1E6</color>
+    
+    <!-- Eski tema renkleri (geriye uyumluluk için) - Karanlık Mod -->
+    <color name="colorPrimaryDark">#1A1A1A</color>
+    <color name="colorAccent">#8AB4F8</color>
+    
+    <!-- Sekme renkleri - Karanlık Mod -->
+    <color name="tabBackground">#1F1F1F</color>
+    <color name="tabBackgroundInactive">#121212</color>
+    <color name="tabBorderActive">#8AB4F8</color>
+    <color name="tabBorderInactive">#333333</color>
+    <color name="tabTextActive">#E8EAED</color>
+    <color name="tabTextInactive">#9AA0A6</color>
+    
+    <!-- Arayüz renkleri - Karanlık Mod -->
+    <color name="toolbarBackground">#1F1F1F</color>
+    <color name="addressBarBackground">#2D2D2D</color>
+    <color name="addressBarBorder">#3C4043</color>
+    <color name="dividerColor">#3C4043</color>
+    <color name="iconTint">#BDC1C6</color>
+    <color name="iconTintActive">#8AB4F8</color>
+    
+    <!-- PersonAdapter için eksik renkler - Karanlık Mod -->
+    <color name="selected_item_bg">#1E2027</color>
+    <color name="highlighted_item_bg">#262D36</color>
+    <color name="card_background">#1F1F1F</color>
+    <color name="text_primary">#E8EAED</color>
+    <color name="text_secondary">#BDC1C6</color>
+    <color name="text_tertiary">#80868B</color>
+</resources>
