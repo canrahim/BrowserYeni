@@ -86,6 +86,10 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     // Arama bayrakları
     private var isManualSearchActive = false
     private var isSerialSearchActive = false
+    
+    // QR kontrol için zamanlayıcı
+    private var qrCheckHandler: Handler? = null
+    private var qrCheckRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -130,6 +134,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         setupFloatingMenuButtons()  // Yeni eklenen - açılır kapanır menü butonlarını ayarla
         observeViewModel()
         handleOrientationChanges()
+        
+        // QR handler'ı başlat
+        qrCheckHandler = Handler(Looper.getMainLooper())
     }
 
     private fun setupDownloadManager() {
@@ -347,6 +354,22 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                     // URL'deki son rakamları DataHolder'a kaydet
                     // Sekme değişiminde de çağrılır
                     saveLastDigitsToDataHolder(tab.url)
+                    
+                    // **İyileştirildi: Sekme değişiminde QR kontrol fonksiyonunu çağır**
+                    if (!isManualSearchActive && tab.url.contains("szutest.com.tr", ignoreCase = true)) {
+                        // Önceki kontrolü iptal et
+                        qrCheckRunnable?.let { 
+                            qrCheckHandler?.removeCallbacks(it)
+                        }
+                        
+                        // Yeni kontrol başlat
+                        qrCheckRunnable = Runnable {
+                            checkForQrCodeOnPage()
+                        }
+                        
+                        // QR kontrolünü 1 saniye sonra başlat
+                        qrCheckHandler?.postDelayed(qrCheckRunnable!!, 1000)
+                    }
                 }
             }
         })
@@ -507,7 +530,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // Menü görünürlüğünü değiştir
         val isVisible = binding.buttonsScrollView.visibility == View.VISIBLE
 
-        // Interpolator'ları tanımla (daha yumuak animasyonlar için)
+        // Interpolator'ları tanımla (daha yumuşak animasyonlar için)
         val overshootInterpolator = android.view.animation.OvershootInterpolator(0.5f)
         val accelerateDecelerateInterpolator = android.view.animation.AccelerateDecelerateInterpolator()
 
@@ -742,13 +765,23 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // URL değiştiğinde DataHolder'a kaydet
         saveLastDigitsToDataHolder(url)
         
-        // Eğer manuel arama aktif değilse ve URL szutest.com.tr içeriyorsa QR kodu kontrol et
-        val activeTab = viewModel.activeTab.value
-        if (activeTab != null && !isManualSearchActive && url.contains("szutest.com.tr", ignoreCase = true)) {
-            // QR kodunu kontrol et
-            Handler(Looper.getMainLooper()).postDelayed({
-                checkForQrCodeOnPage()
-            }, 500)
+        // **İyileştirildi: Manuel arama kontrolü sadece performQrCodeSearch çağrıldığında aktif olur**
+        // URL değişiminde her zaman QR kontrolü yap, ancak performans için kısa gecikme ekle
+        if (url.contains("szutest.com.tr", ignoreCase = true)) {
+            // Önceki kontrolü iptal et
+            qrCheckRunnable?.let { 
+                qrCheckHandler?.removeCallbacks(it)
+            }
+            
+            // Yeni kontrol başlat
+            qrCheckRunnable = Runnable {
+                if (!isManualSearchActive) {
+                    checkForQrCodeOnPage()
+                }
+            }
+            
+            // QR kontrolünü 500ms sonra başlat
+            qrCheckHandler?.postDelayed(qrCheckRunnable!!, 500)
         }
     }
 
@@ -1115,6 +1148,8 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     /**
      * WebView içeriğinde "Topraklama Tesisatı" metni olup olmadığını kontrol eder
      * Eğer varsa, URL'nin son rakamlarını DataHolder'daki urltoprak'a kaydeder
+     * 
+     * **İyileştirildi: Fragment null kontrolü ve tekrar deneme mekanizması**
      */
     private fun checkContentForTopraklama(url: String, lastDigits: String) {
         // Log ekleyelim
@@ -1126,8 +1161,16 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             return
         }
         
-        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: run {
-            println("fragment is null for tabId: ${currentTab.id}")
+        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id)
+        
+        if (fragment == null) {
+            println("fragment is null for tabId: ${currentTab.id} - tekrar denenecek")
+            
+            // Fragment henüz yüklenmemiş olabilir, 500ms sonra tekrar dene
+            Handler(Looper.getMainLooper()).postDelayed({
+                checkContentForTopraklama(url, lastDigits)
+            }, 500)
+            
             return
         }
         
@@ -1495,7 +1538,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: return
         val webView = fragment.getWebView() ?: return
         
-        // Manuel arama modunu aktifleştir
+        // **Manuel arama modunu aktifleştir**
         isManualSearchActive = true
         
         // Eğer current page EquipmentList değilse önce oraya git
@@ -1509,12 +1552,18 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             waitForPageLoad(fragment, "EquipmentList") {
                 // Sayfa yüklendiğinde arama yap
                 executeQrCodeSearch(fragment, qrText)
-                isManualSearchActive = false
+                // **Arama tamamlandıktan sonra manuel arama modunu kapat**
+                Handler(Looper.getMainLooper()).postDelayed({
+                    isManualSearchActive = false
+                }, 2000)
             }
         } else {
             // Already on the correct page, execute search directly
             executeQrCodeSearch(fragment, qrText)
-            isManualSearchActive = false
+            // **Arama tamamlandıktan sonra manuel arama modunu kapat**
+            Handler(Looper.getMainLooper()).postDelayed({
+                isManualSearchActive = false
+            }, 2000)
         }
     }
     
@@ -1563,6 +1612,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     
     /**
      * QR kod arama sonuçlarını kontrol et
+     * **İyileştirildi: QR arama alanını bulunan değerle güncellemeyi garanti eder**
      */
     private fun checkQrCodeSearchResult(fragment: WebViewFragment, qrText: String) {
         val webView = fragment.getWebView() ?: return
@@ -1614,9 +1664,17 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                     val foundQrCode = jsonArray.getString(0)
                     
                     runOnUiThread {
-                        // QR edittext'i bulunan değerle güncelle
+                        // **QR edittext'i bulunan değerle güncelle**
                         qrSearchInput.setText(foundQrCode)
-                        // Toast mesajı kaldırıldı
+                        qrSearchInput.setSelection(foundQrCode.length) // İmleci sona taşı
+                        
+                        // Ek garantili güncelleme - görevini tamamladığından emin ol
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (qrSearchInput.text.toString() != foundQrCode) {
+                                qrSearchInput.setText(foundQrCode)
+                                qrSearchInput.setSelection(foundQrCode.length)
+                            }
+                        }, 100)
                     }
                 }
             } catch (e: Exception) {
@@ -1774,11 +1832,18 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     /**
      * Otomatik QR kod kontrolü - her sayfada QR kodu olup olmadığını kontrol eder
      * Eski projedeki checkForQrCodeOnPage() mantığını uygula
+     * **İyileştirildi: QR arama alanını otomatik olarak güncellenir ve Fragment null kontrolü**
      */
     private fun checkForQrCodeOnPage() {
         // Aktif sekmedeki WebView'i al
         val currentTab = viewModel.activeTab.value ?: return
-        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: return
+        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id)
+        
+        if (fragment == null) {
+            println("checkForQrCodeOnPage: fragment is null for tabId: ${currentTab.id}")
+            return
+        }
+        
         val webView = fragment.getWebView() ?: return
         
         val checkResultScript = """
@@ -1826,9 +1891,17 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                     val currentQrText = qrSearchInput.text.toString().trim()
                     if (foundQrCode != currentQrText) {
                         runOnUiThread {
-                            // QR edittext'i bulunan değerle güncelle
+                            // **QR edittext'i bulunan değerle güncelle**
                             qrSearchInput.setText(foundQrCode)
-                            // Toast mesajı kaldırıldı - sessiz güncelleme
+                            qrSearchInput.setSelection(foundQrCode.length) // İmleci sona taşı
+                            
+                            // Ek garantili güncelleme - görevini tamamladığından emin ol
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                if (qrSearchInput.text.toString() != foundQrCode) {
+                                    qrSearchInput.setText(foundQrCode)
+                                    qrSearchInput.setSelection(foundQrCode.length)
+                                }
+                            }, 100)
                         }
                     }
                 }
@@ -1841,6 +1914,10 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     override fun onDestroy() {
         super.onDestroy()
 
+        // Handler'ları temizle
+        qrCheckRunnable?.let { qrCheckHandler?.removeCallbacks(it) }
+        qrCheckHandler = null
+        
         // İndirme modülünü temizle
         webViewDownloadHelper.cleanup()
 
