@@ -52,6 +52,7 @@ Referans: Material Design 3 Color System, Material Theme Builder
     <!-- EditText renkleri -->
     <color name="editTextBackground">#FAFAFA</color>
     <color name="editTextBorder">#E0E0E0</color>
+    <color name="editTextStroke">#5F6368</color>
     
     <!-- Buton renkleri - Modern Indigo Temaları -->
     <color name="buttonPrimary">#6366F1</color>

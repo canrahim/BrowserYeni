@@ -44,6 +44,11 @@ import com.asforce.asforcebrowser.webview.ComboboxSearchHelper
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
+import android.view.View.OnClickListener
+import com.google.android.material.textfield.TextInputEditText
+import org.json.JSONObject
+import org.json.JSONArray
+import android.view.inputmethod.InputMethodManager
 
 /**
  * MainActivity - Ana ekran
@@ -73,6 +78,14 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     
     // SharedPreferences için
     private lateinit var sharedPreferences: SharedPreferences
+    
+    // QR ve Seri No arama alanları için
+    private lateinit var qrSearchInput: TextInputEditText
+    private lateinit var serialSearchInput: TextInputEditText
+    
+    // Arama bayrakları
+    private var isManualSearchActive = false
+    private var isSerialSearchActive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,6 +124,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
 
         setupDownloadManager()
         setupSearchDialog()
+        setupSearchInputs()  // QR ve Seri No arama alanlarını ayarla
         setupAdapters()
         setupListeners()
         setupFloatingMenuButtons()  // Yeni eklenen - açılır kapanır menü butonlarını ayarla
@@ -175,6 +189,54 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         }
     }
 
+    /**
+     * QR Kod ve Seri Numarası arama işlevlerini ayarla
+     * Eski projede qrNo ve srNo EditTextlerinin mantığını uygula
+     * 
+     * Referans: Eski projeden qrNo ve srNo arama mantığı
+     */
+    private fun setupSearchInputs() {
+        // QR arama alanını başlat
+        qrSearchInput = findViewById(R.id.searchEditText1)
+        
+        // Seri No arama alanını başlat
+        serialSearchInput = findViewById(R.id.searchEditText2)
+        
+        // QR arama alanı için IME_ACTION_SEARCH işleyicisi
+        qrSearchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                hideKeyboard()
+                performQrCodeSearch()
+                return@setOnEditorActionListener true
+            }
+            return@setOnEditorActionListener false
+        }
+        
+        // QR arama alanı için end icon ayarla
+        val qrTextInputLayout = findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.text_input_layout_qr)
+        qrTextInputLayout?.setEndIconOnClickListener {
+            hideKeyboard()
+            performQrCodeSearch()
+        }
+        
+        // Seri No arama alanı için IME_ACTION_SEARCH işleyicisi
+        serialSearchInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                hideKeyboard()
+                performSerialNumberSearch()
+                return@setOnEditorActionListener true
+            }
+            return@setOnEditorActionListener false
+        }
+        
+        // Seri No arama alanı için end icon ayarla
+        val serialTextInputLayout = findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.text_input_layout_sr)
+        serialTextInputLayout?.setEndIconOnClickListener {
+            hideKeyboard()
+            performSerialNumberSearch()
+        }
+    }
+    
     private fun setupAdapters() {
         // ViewPager2 optimizer'i başlat
         viewPagerOptimizer = ViewPager2Optimizer(this)
@@ -679,6 +741,15 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     override fun onUrlChanged(url: String) {
         // URL değiştiğinde DataHolder'a kaydet
         saveLastDigitsToDataHolder(url)
+        
+        // Eğer manuel arama aktif değilse ve URL szutest.com.tr içeriyorsa QR kodu kontrol et
+        val activeTab = viewModel.activeTab.value
+        if (activeTab != null && !isManualSearchActive && url.contains("szutest.com.tr", ignoreCase = true)) {
+            // QR kodunu kontrol et
+            Handler(Looper.getMainLooper()).postDelayed({
+                checkForQrCodeOnPage()
+            }, 500)
+        }
     }
 
     /**
@@ -1362,6 +1433,409 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         
         // İlk aramayı başlat
         searchNext()
+    }
+    
+    /**
+     * Klavyeyi gizle
+     */
+    private fun hideKeyboard() {
+        val inputMethodManager = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        currentFocus?.let { view ->
+            inputMethodManager.hideSoftInputFromWindow(view.windowToken, 0)
+            view.clearFocus()
+        }
+    }
+    
+    /**
+     * Sayfa yüklenme tamamlanmayı bekler ve callback çalıştırır
+     */
+    private fun waitForPageLoad(fragment: WebViewFragment, urlKeyword: String, callback: () -> Unit) {
+        // İlk 100ms'de hızlı kontroller
+        val fastHandler = Handler(Looper.getMainLooper())
+        var attempts = 0
+        val maxAttempts = 20 // 2 saniye toplam
+        
+        val checkLoad = object : Runnable {
+            override fun run() {
+                val webView = fragment.getWebView()
+                val currentUrl = webView?.url
+                
+                if (currentUrl?.contains(urlKeyword) == true && webView.progress == 100) {
+                    // Sayfa yüklendi - daha fazla bekle form elemanları için
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        callback.invoke()
+                    }, 1000)
+                } else if (attempts < maxAttempts) {
+                    attempts++
+                    fastHandler.postDelayed(this, 100) // 100ms aralıklarla kontrol
+                } else {
+                    // Timeout - yine de aramayı yap
+                    callback.invoke()
+                }
+            }
+        }
+        
+        fastHandler.post(checkLoad)
+    }
+    
+    /**
+     * QR kod arama işlemi
+     * Eski projedeki performQrCodeSearch() mantığını uygula
+     */
+    private fun performQrCodeSearch() {
+        val qrText = qrSearchInput.text.toString().trim()
+        
+        if (qrText.isEmpty()) {
+            // Boş girdi durumunda sessizce çık
+            return
+        }
+        
+        // Mevcut aktif tab ve WebView bileşenini al
+        val currentTab = viewModel.activeTab.value ?: return
+        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: return
+        val webView = fragment.getWebView() ?: return
+        
+        // Manuel arama modunu aktifleştir
+        isManualSearchActive = true
+        
+        // Eğer current page EquipmentList değilse önce oraya git
+        val currentUrl = currentTab.url
+        if (!currentUrl.contains("EquipmentList")) {
+            // Navigate to EquipmentList page first
+            webView.loadUrl("https://app.szutest.com.tr/EXT/PKControl/EquipmentList")
+            
+            // URL değişikliğine göre sayfa yüklenişini izle
+            // Handler ile yükleme tamamlanmaya kadar bekle
+            waitForPageLoad(fragment, "EquipmentList") {
+                // Sayfa yüklendiğinde arama yap
+                executeQrCodeSearch(fragment, qrText)
+                isManualSearchActive = false
+            }
+        } else {
+            // Already on the correct page, execute search directly
+            executeQrCodeSearch(fragment, qrText)
+            isManualSearchActive = false
+        }
+    }
+    
+    /**
+     * WebView'da QR kodunu ara ve sonucu kontrol et
+     */
+    private fun executeQrCodeSearch(fragment: WebViewFragment, qrText: String) {
+        val webView = fragment.getWebView() ?: return
+        
+        // JavaScript ile QR kodunu ara
+        val searchScript = """
+            (function() {
+                try {
+                    // QR input alanını bul
+                    var qrInput = document.querySelector('input#filter_qr');
+                    if (!qrInput) {
+                        return "QR input field not found";
+                    }
+                    
+                    // QR değerini ayarla
+                    qrInput.value = "$qrText";
+                    
+                    // Arama butonunu bul ve tıkla
+                    var searchButton = document.querySelector('i.fa.fa-search[title="Filtrele"]');
+                    if (!searchButton) {
+                        return "Search button not found";
+                    }
+                    
+                    // Arama butonunu tıkla
+                    searchButton.click();
+                    
+                    return "Search executed";
+                } catch(e) {
+                    return "Error: " + e.message;
+                }
+            })();
+        """.trimIndent()
+        
+        webView.evaluateJavascript(searchScript) { result ->
+            // Arama tamamlandıktan sonra sonuçları kontrol et
+            Handler(Looper.getMainLooper()).postDelayed({
+                checkQrCodeSearchResult(fragment, qrText)
+            }, 1500)
+        }
+    }
+    
+    /**
+     * QR kod arama sonuçlarını kontrol et
+     */
+    private fun checkQrCodeSearchResult(fragment: WebViewFragment, qrText: String) {
+        val webView = fragment.getWebView() ?: return
+        
+        val checkResultScript = """
+            (function() {
+                try {
+                    // Sonuç değerini spesifik formatta bul
+                    var resultElements = document.querySelectorAll('div.col-sm-8 p.form-control-static');
+                    var results = [];
+                    
+                    for (var i = 0; i < resultElements.length; i++) {
+                        var text = resultElements[i].textContent.trim();
+                        if (text && /^\d+$/.test(text)) {  // Sadece sayı içeren değerleri kontrol et
+                            results.push(text);
+                        }
+                    }
+                    
+                    if (results.length > 0) {
+                        return JSON.stringify(results);
+                    } else {
+                        return "NO_RESULTS";
+                    }
+                } catch(e) {
+                    return "ERROR: " + e.message;
+                }
+            })();
+        """.trimIndent()
+        
+        webView.evaluateJavascript(checkResultScript) { result ->
+            try {
+                // Sonucu temizle
+                val cleanResult = result.trim().removeSurrounding("\"").replace("\\\"", "\"").replace("\\\\", "\\")
+                
+                if (cleanResult == "NO_RESULTS") {
+                    // Sessizce devam et - bilgi mesajı gösterme
+                    return@evaluateJavascript
+                }
+                
+                if (cleanResult.startsWith("ERROR")) {
+                    // Sessizce devam et - hata mesajı gösterme
+                    return@evaluateJavascript
+                }
+                
+                // JSON sonucu parse et
+                val jsonArray = org.json.JSONArray(cleanResult)
+                
+                if (jsonArray.length() > 0) {
+                    val foundQrCode = jsonArray.getString(0)
+                    
+                    runOnUiThread {
+                        // QR edittext'i bulunan değerle güncelle
+                        qrSearchInput.setText(foundQrCode)
+                        // Toast mesajı kaldırıldı
+                    }
+                }
+            } catch (e: Exception) {
+                // Hata durumunda sessizce devam et
+            }
+        }
+    }
+    
+    /**
+     * Seri numarası arama işlemi
+     * Eski projedeki performSerialNumberSearch() mantığını uygula
+     */
+    private fun performSerialNumberSearch() {
+        val serialText = serialSearchInput.text.toString().trim()
+        
+        if (serialText.isEmpty()) {
+            // Boş girdi durumunda sessizce çık
+            return
+        }
+        
+        // Mevcut aktif tab ve WebView bileşenini al
+        val currentTab = viewModel.activeTab.value ?: return
+        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: return
+        val webView = fragment.getWebView() ?: return
+        
+        // Manuel seri numarası arama modunu aktifleştir
+        isSerialSearchActive = true
+        
+        // Eğer current page EquipmentList değilse önce oraya git
+        val currentUrl = currentTab.url
+        if (!currentUrl.contains("EquipmentList")) {
+            // Navigate to EquipmentList page first
+            webView.loadUrl("https://app.szutest.com.tr/EXT/PKControl/EquipmentList")
+            
+            // URL değişikliğine göre sayfa yüklenişini izle
+            // Handler ile yükleme tamamlanmaya kadar bekle
+            waitForPageLoad(fragment, "EquipmentList") {
+                // Sayfa yüklendiğinde arama yap
+                executeSerialNumberSearch(fragment, serialText)
+                isSerialSearchActive = false
+            }
+        } else {
+            // Already on the correct page, execute search directly
+            executeSerialNumberSearch(fragment, serialText)
+            isSerialSearchActive = false
+        }
+    }
+    
+    /**
+     * WebView'da seri numarasını ara
+     */
+    private fun executeSerialNumberSearch(fragment: WebViewFragment, serialText: String) {
+        val webView = fragment.getWebView() ?: return
+        
+        // JavaScript ile seri numarasını ara
+        val searchScript = """
+            (function() {
+                try {
+                    // Seri numarası input alanını bul
+                    var serialInput = document.querySelector('input#filter_serialnumber');
+                    if (!serialInput) {
+                        return "Serial number input field not found";
+                    }
+                    
+                    // Seri numarası değerini ayarla
+                    serialInput.value = "$serialText";
+                    
+                    // Arama butonunu bul ve tıkla
+                    var searchButton = document.querySelector('i.fa.fa-search[title="Filtrele"]');
+                    if (!searchButton) {
+                        return "Search button not found";
+                    }
+                    
+                    // Arama butonunu tıkla
+                    searchButton.click();
+                    
+                    return "Search executed";
+                } catch(e) {
+                    return "Error: " + e.message;
+                }
+            })();
+        """.trimIndent()
+        
+        webView.evaluateJavascript(searchScript) { result ->
+            // Arama tamamlandıktan sonra sonuçları kontrol et
+            Handler(Looper.getMainLooper()).postDelayed({
+                checkSerialNumberSearchResult(fragment, serialText)
+            }, 1500)
+        }
+    }
+    
+    /**
+     * Seri numarası arama sonuçlarını kontrol et
+     */
+    private fun checkSerialNumberSearchResult(fragment: WebViewFragment, serialText: String) {
+        val webView = fragment.getWebView() ?: return
+        
+        val checkResultScript = """
+            (function() {
+                try {
+                    // Sonuç değerini spesifik formatta bul
+                    var resultElements = document.querySelectorAll('div.col-sm-8 p.form-control-static');
+                    var results = [];
+                    
+                    for (var i = 0; i < resultElements.length; i++) {
+                        var text = resultElements[i].textContent.trim();
+                        if (text) {
+                            results.push(text);
+                        }
+                    }
+                    
+                    if (results.length > 0) {
+                        return JSON.stringify(results);
+                    } else {
+                        return "NO_RESULTS";
+                    }
+                } catch(e) {
+                    return "ERROR: " + e.message;
+                }
+            })();
+        """.trimIndent()
+        
+        webView.evaluateJavascript(checkResultScript) { result ->
+            try {
+                // Sonucu temizle
+                val cleanResult = result.trim().removeSurrounding("\"").replace("\\\"", "\"").replace("\\\\", "\\")
+                
+                if (cleanResult == "NO_RESULTS") {
+                    // Sessizce devam et - bilgi mesajı gösterme
+                    return@evaluateJavascript
+                }
+                
+                if (cleanResult.startsWith("ERROR")) {
+                    // Sessizce devam et - hata mesajı gösterme
+                    return@evaluateJavascript
+                }
+                
+                // JSON sonucu parse et
+                val jsonArray = org.json.JSONArray(cleanResult)
+                
+                if (jsonArray.length() > 0) {
+                    val foundSerialNumber = jsonArray.getString(0)
+                    
+                    runOnUiThread {
+                        // Seri No edittext'i bulunan değerle güncelle
+                        serialSearchInput.setText(foundSerialNumber)
+                    }
+                }
+            } catch (e: Exception) {
+                // Hata durumunda sessizce devam et
+            }
+        }
+    }
+    
+    /**
+     * Otomatik QR kod kontrolü - her sayfada QR kodu olup olmadığını kontrol eder
+     * Eski projedeki checkForQrCodeOnPage() mantığını uygula
+     */
+    private fun checkForQrCodeOnPage() {
+        // Aktif sekmedeki WebView'i al
+        val currentTab = viewModel.activeTab.value ?: return
+        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: return
+        val webView = fragment.getWebView() ?: return
+        
+        val checkResultScript = """
+            (function() {
+                try {
+                    // Sonuç değerini spesifik formatta bul
+                    var resultElements = document.querySelectorAll('div.col-sm-8 p.form-control-static');
+                    var results = [];
+                    
+                    for (var i = 0; i < resultElements.length; i++) {
+                        var text = resultElements[i].textContent.trim();
+                        if (text && /^\d+$/.test(text)) {  // Sadece sayı içeren değerleri kontrol et
+                            results.push(text);
+                        }
+                    }
+                    
+                    if (results.length > 0) {
+                        return JSON.stringify(results);
+                    } else {
+                        return "NO_RESULTS";
+                    }
+                } catch(e) {
+                    return "ERROR: " + e.message;
+                }
+            })();
+        """.trimIndent()
+        
+        webView.evaluateJavascript(checkResultScript) { result ->
+            try {
+                // Sonucu temizle
+                val cleanResult = result.trim().removeSurrounding("\"").replace("\\\"", "\"").replace("\\\\", "\\")
+                
+                if (cleanResult == "NO_RESULTS" || cleanResult.startsWith("ERROR")) {
+                    // Herhangi bir hata veya sonuç bulunamazsa sessizce çık
+                    return@evaluateJavascript
+                }
+                
+                // JSON sonucu parse et
+                val jsonArray = org.json.JSONArray(cleanResult)
+                
+                if (jsonArray.length() > 0) {
+                    val foundQrCode = jsonArray.getString(0)
+                    
+                    // Bulunan değer şu anki değerden farklıysa güncelle
+                    val currentQrText = qrSearchInput.text.toString().trim()
+                    if (foundQrCode != currentQrText) {
+                        runOnUiThread {
+                            // QR edittext'i bulunan değerle güncelle
+                            qrSearchInput.setText(foundQrCode)
+                            // Toast mesajı kaldırıldı - sessiz güncelleme
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Hata durumunda sessizce devam et
+            }
+        }
     }
     
     override fun onDestroy() {

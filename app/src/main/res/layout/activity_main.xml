@@ -191,42 +191,87 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/appBarLayout">
         
-        <!-- İlk EditText -->
-        <EditText
-            android:id="@+id/searchEditText1"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_edittext"
-            android:hint="Arama 1"
-            android:inputType="text"
-            android:padding="8dp"
-            android:textColor="@color/tabTextActive"
-            android:textColorHint="@color/tabTextInactive"
-            android:textSize="12sp" />
+        <!-- QR Arama için TextInputLayout -->
+        <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/text_input_layout_qr"
+        android:layout_width="0dp"
+        android:layout_height="36dp"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="6dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:boxBackgroundColor="@color/editTextBackground"
+            app:boxBackgroundMode="outline"
+            app:boxCornerRadiusBottomEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxStrokeColor="@color/editTextStroke"
+            app:boxStrokeWidth="1dp"
+            app:endIconDrawable="@drawable/ic_search"
+            app:endIconMode="custom"
+            app:endIconTint="@color/iconTint"
+            app:hintEnabled="false">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchEditText1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@null"
+                android:hint="QR Ara"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:padding="8dp"
+                android:textColor="@color/tabTextActive"
+                android:textColorHint="@color/tabTextInactive"
+                android:textSize="12sp"
+                android:maxLength="20" />
+        </com.google.android.material.textfield.TextInputLayout>
             
-        <!-- Sadece arama butonu -->
-        <include layout="@layout/search_button_layout" 
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"/>
+        <!-- Arama butonu kaldırıldı - artık TextInputLayout ile birleştirildi -->
         
-        <!-- İkinci EditText -->
-        <EditText
-            android:id="@+id/searchEditText2"
-            android:layout_width="0dp"
-            android:layout_height="32dp"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/bg_edittext"
-            android:hint="Arama 2"
-            android:inputType="text"
-            android:padding="8dp"
-            android:textColor="@color/tabTextActive"
-            android:textColorHint="@color/tabTextInactive"
-            android:textSize="12sp" />
+        <!-- Seri No Arama için TextInputLayout -->
+        <!-- Search Button Include -->
+        <include
+        layout="@layout/search_button_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp" />
+        
+        <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/text_input_layout_sr"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="12dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:boxBackgroundColor="@color/editTextBackground"
+            app:boxBackgroundMode="outline"
+            app:boxCornerRadiusBottomEnd="8dp"
+            app:boxCornerRadiusBottomStart="8dp"
+            app:boxCornerRadiusTopEnd="8dp"
+            app:boxCornerRadiusTopStart="8dp"
+            app:boxStrokeColor="@color/editTextStroke"
+            app:boxStrokeWidth="1dp"
+            app:endIconDrawable="@drawable/ic_search"
+            app:endIconMode="custom"
+            app:endIconTint="@color/iconTint"
+            app:hintEnabled="false">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/searchEditText2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@null"
+                android:hint="Seri No Ara"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:padding="8dp"
+                android:textColor="@color/tabTextActive"
+                android:textColorHint="@color/tabTextInactive"
+                android:textSize="12sp"
+                android:maxLength="20" />
+        </com.google.android.material.textfield.TextInputLayout>
             
     </LinearLayout>
 
