@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bu dosya eski QR stillerini içeriyordu. 
+         Artık tüm stiller styles.xml dosyasında bulunmaktadır.
+         Bu dosya sadece geçiş için yedek olarak durmaktadır. -->
+</resources>

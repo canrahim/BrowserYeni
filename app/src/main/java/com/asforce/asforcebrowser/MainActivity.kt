@@ -1978,7 +1978,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         loadUrl(qrContent)
         
         // Bilgi mesajı göster
-        Toast.makeText(this, "QR Kod tarandı: $qrContent", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "QR Kod tarandı, sayfa açılıyor...", Toast.LENGTH_SHORT).show()
     }
     
     /**

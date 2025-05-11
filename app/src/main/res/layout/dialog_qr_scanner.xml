@@ -15,7 +15,7 @@ Referans: Android CameraX Documentation ve Material Dialog Design
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@android:color/white"
+        android:background="@android:color/black"
         android:padding="16dp">
 
         <TextView
@@ -24,7 +24,7 @@ Referans: Android CameraX Documentation ve Material Dialog Design
             android:layout_height="wrap_content"
             android:layout_centerInParent="true"
             android:text="QR Kod Tarama"
-            android:textColor="@android:color/black"
+            android:textColor="@android:color/white"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -36,7 +36,7 @@ Referans: Android CameraX Documentation ve Material Dialog Design
             android:layout_centerVertical="true"
             android:background="@android:color/transparent"
             android:text="×"
-            android:textColor="@android:color/black"
+            android:textColor="@android:color/white"
             android:textSize="24sp" />
 
     </RelativeLayout>
@@ -55,76 +55,11 @@ Referans: Android CameraX Documentation ve Material Dialog Design
             android:layout_height="match_parent"
             android:layout_gravity="center" />
 
-        <!-- Scanner Overlay -->
-        <FrameLayout
+        <!-- Gelişmiş Tarayıcı Ön İzleme Overlay -->
+        <com.asforce.asforcebrowser.qr.enhancement.ScannerOverlayView
+            android:id="@+id/scanner_overlay"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <!-- Yarı saydam layer -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#80000000" />
-
-            <!-- QR Tarama Çerçevesi -->
-            <LinearLayout
-                android:layout_width="280dp"
-                android:layout_height="280dp"
-                android:layout_gravity="center"
-                android:orientation="vertical">
-
-                <!-- Üst çerçeve -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="2dp"
-                    android:background="@android:color/white" />
-
-                <!-- Orta alan (şeffaf) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:orientation="horizontal">
-
-                    <!-- Sol çerçeve -->
-                    <View
-                        android:layout_width="2dp"
-                        android:layout_height="match_parent"
-                        android:background="@android:color/white" />
-
-                    <!-- QR okuma alanı (şeffaf) -->
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:background="@android:color/transparent" />
-
-                    <!-- Sağ çerçeve -->
-                    <View
-                        android:layout_width="2dp"
-                        android:layout_height="match_parent"
-                        android:background="@android:color/white" />
-
-                </LinearLayout>
-
-                <!-- Alt çerçeve -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="2dp"
-                    android:background="@android:color/white" />
-
-            </LinearLayout>
-
-            <!-- QR Tarama Çizgisi -->
-            <ImageView
-                android:id="@+id/scanning_line"
-                android:layout_width="240dp"
-                android:layout_height="2dp"
-                android:layout_gravity="center_horizontal"
-                android:background="@android:color/holo_green_light"
-                android:layout_marginTop="-40dp" />
-
-        </FrameLayout>
+            android:layout_height="match_parent"/>
 
     </FrameLayout>
 
@@ -132,7 +67,7 @@ Referans: Android CameraX Documentation ve Material Dialog Design
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="@android:color/black"
         android:orientation="vertical"
         android:padding="16dp">
 
@@ -143,7 +78,7 @@ Referans: Android CameraX Documentation ve Material Dialog Design
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="Kamerayı QR koduna doğrultun"
-            android:textColor="@android:color/black"
+            android:textColor="@android:color/white"
             android:textSize="14sp"
             android:visibility="visible" />
 
@@ -164,7 +99,7 @@ Referans: Android CameraX Documentation ve Material Dialog Design
                 android:drawableLeft="@android:drawable/ic_notification_overlay"
                 android:drawableTint="@android:color/black"
                 android:text="Flash"
-                android:textColor="@android:color/black"
+                android:textColor="@android:color/white"
                 android:layout_marginEnd="16dp" />
 
             <!-- Zoom Control Button -->
@@ -176,12 +111,25 @@ Referans: Android CameraX Documentation ve Material Dialog Design
                 android:drawableLeft="@android:drawable/ic_input_add"
                 android:drawableTint="@android:color/black"
                 android:text="Zoom"
-                android:textColor="@android:color/black"
+                android:textColor="@android:color/white"
                 android:layout_marginStart="16dp" />
 
+            
+            <!-- Low Light Enhancement Toggle -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_low_light_mode"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:drawableLeft="@android:drawable/ic_menu_preferences"
+                android:drawableTint="@android:color/white"
+                android:text="Auto"
+                android:textColor="@android:color/white"
+                android:layout_marginStart="16dp" />
+                
         </LinearLayout>
 
-            <android.widget.TextView
+            <TextView
                 android:id="@+id/qr_result_preview"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
