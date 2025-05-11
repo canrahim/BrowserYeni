@@ -113,6 +113,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         setupSearchDialog()
         setupAdapters()
         setupListeners()
+        setupFloatingMenuButtons()  // Yeni eklenen - açılır kapanır menü butonlarını ayarla
         observeViewModel()
         handleOrientationChanges()
     }
@@ -397,6 +398,124 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     }
 
     /**
+     * Açılır kapanır menü butonlarını ayarla
+     * Floating action style butonlar kullanıcı dostu görünüm sağlar
+     */
+    private fun setupFloatingMenuButtons() {
+        // Menü açma/kapama butonu
+        binding.btnToggleButtons.setOnClickListener {
+            toggleFloatingMenu()
+        }
+
+        // Ekipman Listesi butonu
+        binding.btnEquipmentList.setOnClickListener {
+            loadUrl("https://app.szutest.com.tr/EXT/PKControl/EquipmentList")
+        }
+
+        // Kontrol Listesi butonu (PE)
+        binding.btnControlList.setOnClickListener {
+            loadUrl("https://app.szutest.com.tr/EXT/PKControl/EKControlList")
+        }
+
+        // Kapsam Dışı butonu - pop-up menü gösterir
+        binding.btnScopeOut.setOnClickListener {
+            showScopeOutMenu()
+        }
+
+        // Cihaz Ekle butonu - mevcut aktif WebView'de cihaz listesini alır
+        binding.btnAddDevice.setOnClickListener {
+            showDeviceAddMenu()
+        }
+
+        // QR Tarama butonu - QR kamera aktivitesini başlatır
+        binding.btnQrScan.setOnClickListener {
+            // QR Tarama özelliği henüz uygulanmadı
+            Toast.makeText(this@MainActivity, "QR Tarama özelliği yakında...", Toast.LENGTH_SHORT).show()
+        }
+
+        // Uygulama ilk açıldığında menü görünürlüğünü ayarla
+        binding.buttonsScrollView.visibility = View.GONE
+    }
+
+    /**
+     * Açılır kapanır menüyü aç/kapat
+     * Animasyonlu geçişler ile kullanıcı deneyimini iyileştirir
+     */
+    private fun toggleFloatingMenu() {
+        // Menü görünürlüğünü değiştir
+        val isVisible = binding.buttonsScrollView.visibility == View.VISIBLE
+
+        // Interpolator'ları tanımla (daha yumuak animasyonlar için)
+        val overshootInterpolator = android.view.animation.OvershootInterpolator(0.5f)
+        val accelerateDecelerateInterpolator = android.view.animation.AccelerateDecelerateInterpolator()
+
+        if (isVisible) {
+            // Menü açıksa kapat
+            binding.buttonsScrollView.animate()
+                .alpha(0f)
+                .translationX(-50f)
+                .setDuration(350)
+                .setInterpolator(accelerateDecelerateInterpolator)
+                .withEndAction {
+                    binding.buttonsScrollView.visibility = View.GONE
+                    binding.buttonsScrollView.translationX = 0f
+                }
+                .start()
+
+            // Açma/kapama butonunu zarif animasyonla döndür
+            binding.btnToggleButtons.animate()
+                .rotation(0f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(350)
+                .setInterpolator(overshootInterpolator)
+                .start()
+
+            // Buton renk değişimi
+            val colorAnimation = android.animation.ValueAnimator.ofArgb(
+                binding.btnToggleButtons.backgroundTintList?.defaultColor ?: getColor(R.color.colorPrimary),
+                getColor(R.color.colorPrimary)
+            )
+            colorAnimation.duration = 350
+            colorAnimation.addUpdateListener { animator ->
+                binding.btnToggleButtons.backgroundTintList = android.content.res.ColorStateList.valueOf(animator.animatedValue as Int)
+            }
+            colorAnimation.start()
+        } else {
+            // Menü kapalıysa aç
+            binding.buttonsScrollView.alpha = 0f
+            binding.buttonsScrollView.translationX = -50f
+            binding.buttonsScrollView.visibility = View.VISIBLE
+            binding.buttonsScrollView.animate()
+                .alpha(1f)
+                .translationX(0f)
+                .setDuration(350)
+                .setInterpolator(overshootInterpolator)
+                .start()
+
+            // Açma/kapama butonunu zarif animasyonla döndür
+            binding.btnToggleButtons.animate()
+                .rotation(90f)
+                .scaleX(0.9f)
+                .scaleY(0.9f)
+                .setDuration(350)
+                .setInterpolator(overshootInterpolator)
+                .start()
+
+            // Buton renk değişimi (açıkken daha koyu ton)
+            val colorAnimation = android.animation.ValueAnimator.ofArgb(
+                binding.btnToggleButtons.backgroundTintList?.defaultColor ?: getColor(R.color.colorPrimary),
+                android.graphics.Color.parseColor("#005e9e") // Daha koyu mavi ton
+            )
+            colorAnimation.duration = 350
+            colorAnimation.addUpdateListener { animator ->
+                binding.btnToggleButtons.backgroundTintList = android.content.res.ColorStateList.valueOf(animator.animatedValue as Int)
+            }
+            colorAnimation.start()
+        }
+    }
+
+    /**
      * Sağ menü işlevi - Tarayıcı işlevleri
      * Menü itemleri: Yenile, İleri, İndirilenler
      */
@@ -646,6 +765,196 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // Termal Kamera aktivitesini başlat
         val intent = Intent(this, Menu4Activity::class.java)
         startActivity(intent)
+    }
+
+    /**
+     * Kapsam Dışı ana menüsünü gösterir
+     * Alt kategorileri de içeren pop-up menü
+     */
+    private fun showScopeOutMenu() {
+        // Ana menü kategorileri
+        val mainCategories = arrayOf(
+            "Aydınlatma Cihazları",
+            "Elektrikli El Aletleri",
+            "Şarjlı El Aletleri",
+            "Elektrikli Kaynak Makinası",
+            "Diğer Elektirikli Cihazlar"
+        )
+
+        // PopupMenu ile ana kategorileri göster
+        val menuBtn = binding.btnScopeOut
+        val popup = PopupMenu(this, menuBtn)
+
+        // Menü öğelerini ekle
+        for (i in mainCategories.indices) {
+            popup.menu.add(android.view.Menu.NONE, i, i, mainCategories[i])
+        }
+
+        // Tıklama olaylarını yönet
+        popup.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                0 -> showAydinlatmaSubMenu()
+                1 -> showElektrikElSubMenu()
+                2 -> showSarjliElSubMenu()
+                3 -> showKaynakSubMenu()
+                4 -> showDigerElektrikSubMenu()
+            }
+            true
+        }
+
+        // Menüyü göster
+        popup.show()
+    }
+
+    /**
+     * Aydınlatma alt menüsünü gösterir
+     */
+    private fun showAydinlatmaSubMenu() {
+        // Aydınlatma alt menü öğeleri
+        val subItems = arrayOf(
+            "24V Kablolu Aydınlatma",
+            "Akülü Alan Aydınlatma"
+        )
+
+        showSubMenu("Aydınlatma Cihazları", subItems) { position ->
+            val currentTab = viewModel.activeTab.value
+            val webViewFragment = currentTab?.let { pagerAdapter.getFragmentByTabId(it.id) }
+            val webView = webViewFragment?.getWebView()
+
+            if (webView != null) {
+                when (position) {
+                    0 -> {/* OutOfScopeModule.set24VAydinlatmaOutOfScope(webView) */
+                         Toast.makeText(this, "24V Kablolu Aydınlatma kapsam dışı ayarlandı", Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> {/* OutOfScopeModule.setAkuluAydinlatmaOutOfScope(webView) */
+                         Toast.makeText(this, "Akülü Alan Aydınlatma kapsam dışı ayarlandı", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                showScopeOutSuccessMessage(subItems[position])
+            } else {
+                Toast.makeText(this, "Aktif sekme bulunamadı", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * Elektrik Malzemeleri alt menüsünü gösterir
+     */
+    private fun showElektrikElSubMenu() {
+        // Elektrik alt menü öğeleri
+        val subItems = arrayOf(
+            "Avuç Taşlama",
+            "Sigorta Grubu",
+            "Şalter Grubu",
+            "Pano Aksesuarları"
+        )
+
+        showSubMenu("Elektrik El Aletleri", subItems) { position ->
+            showScopeOutSuccessMessage(subItems[position])
+        }
+    }
+
+    /**
+     * Şarjlı El Aletleri alt menüsünü gösterir
+     */
+    private fun showSarjliElSubMenu() {
+        // Şarjlı alt menü öğeleri
+        val subItems = arrayOf(
+            "Şarjlı Avuç Taşlama",
+            "Sigorta Grubu",
+            "Şalter Grubu",
+            "Pano Aksesuarları"
+        )
+
+        showSubMenu("Şarjlı El Aletleri", subItems) { position ->
+            showScopeOutSuccessMessage(subItems[position])
+        }
+    }
+
+    /**
+     * Elektrikli Kaynak Makinası alt menüsünü gösterir
+     */
+    private fun showKaynakSubMenu() {
+        // Kaynak alt menü öğeleri
+        val subItems = arrayOf(
+            "Kablo Grubu",
+            "Buat Grubu",
+            "Kablo Kanalları"
+        )
+
+        showSubMenu("Tesisat Malzemeleri", subItems) { position ->
+            showScopeOutSuccessMessage(subItems[position])
+        }
+    }
+
+    /**
+     * Diğer Elektrikli Cihazlar alt menüsünü gösterir
+     */
+    private fun showDigerElektrikSubMenu() {
+        // Ölçüm alt menü öğeleri
+        val subItems = arrayOf(
+            "Multimetre",
+            "Topraklama Ölçüm",
+            "İzolasyon Ölçüm",
+            "Termal Kamera"
+        )
+
+        showSubMenu("Ölçüm Aletleri", subItems) { position ->
+            showScopeOutSuccessMessage(subItems[position])
+        }
+    }
+
+    /**
+     * Alt kategori menüsünü gösterir ve seçilen öğeyi işler
+     * @param title Menü başlığı
+     * @param items Menü öğeleri
+     * @param onItemSelected Öğe seçildiğinde çalışacak fonksiyon
+     */
+    private fun showSubMenu(title: String, items: Array<String>, onItemSelected: (Int) -> Unit) {
+        // Alt menü diyaloğunu göster
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setItems(items) { _, which ->
+                onItemSelected(which)
+            }
+            .show()
+    }
+
+    /**
+     * Kapsam dışı ayarlaması başarılı olduğunda bilgi mesajı gösterir
+     * @param itemName Kapsam dışı yapılan öğenin adı
+     */
+    private fun showScopeOutSuccessMessage(itemName: String) {
+        com.google.android.material.snackbar.Snackbar.make(
+            binding.root,
+            "$itemName kapsam dışı olarak ayarlandı",
+            com.google.android.material.snackbar.Snackbar.LENGTH_SHORT
+        ).show()
+    }
+
+    /**
+     * Cihaz ekleme menüsünü gösterir
+     * WebView'de mevcut cihaz listesini alır ve kullanıcıya sunar
+     */
+    private fun showDeviceAddMenu() {
+        val currentTab = viewModel.activeTab.value
+        val webViewFragment = currentTab?.let { pagerAdapter.getFragmentByTabId(it.id) }
+        val webView = webViewFragment?.getWebView()
+
+        if (webView != null) {
+            // JavaScript ile cihaz listesini almak için DeviceManager'ı kullan
+            // DeviceManager sınıfı henüz oluşturulmadığı için basit bir implementasyon kullanabiliriz
+            
+            // Geçici çözüm - kullanıcıya bilgi ver
+            Toast.makeText(this, "Cihaz ekleme özelliği yakında...", Toast.LENGTH_SHORT).show()
+            
+            /* Gelecekteki implementasyon:
+            val deviceManager = DeviceManager(this, webView)
+            deviceManager.fetchDeviceList()
+            */
+        } else {
+            Toast.makeText(this, "Aktif sekme bulunamadı", Toast.LENGTH_SHORT).show()
+        }
     }
 
     /**

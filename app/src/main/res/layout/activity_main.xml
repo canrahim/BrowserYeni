@@ -216,4 +216,163 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/searchMenuContainer" />
 
+    <!-- Açılır Kapanır Butonlar Container - Modern Floating Design -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/floating_buttons_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:cardBackgroundColor="@color/colorSurface"
+        app:cardCornerRadius="31dp"
+        app:cardElevation="8dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <!-- Toggle Button - Menu açma/kapama butonu -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_toggle_buttons"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center_vertical"
+                android:layout_margin="8dp"
+                android:contentDescription="Butonları Göster/Gizle"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp"
+                app:backgroundTint="@color/colorPrimary"
+                app:cornerRadius="20dp"
+                app:elevation="2dp"
+                app:icon="@drawable/ic_menu"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="18dp"
+                app:iconTint="@color/white" />
+
+            <!-- Açılabilir/kapanabilir menü bölümü -->
+            <HorizontalScrollView
+                android:id="@+id/buttons_scroll_view"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="8dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/buttons_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center">
+
+                    <!-- Ekipman Listesi Butonu -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_equipment_list"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginEnd="8dp"
+                        android:backgroundTint="@android:color/transparent"
+                        android:contentDescription="Ekipman Listesi"
+                        android:insetLeft="0dp"
+                        android:insetTop="0dp"
+                        android:insetRight="0dp"
+                        android:insetBottom="0dp"
+                        android:text="E"
+                        android:textSize="24sp"
+                        android:textStyle="bold"
+                        android:textColor="#2196F3"
+                        app:cornerRadius="28dp"
+                        app:elevation="0dp" />
+
+                    <!-- Kontrol Listesi Butonu -->
+                    <FrameLayout
+                        android:layout_width="62dp"
+                        android:layout_height="56dp"
+                        android:layout_marginEnd="8dp">
+
+                        <TextView
+                            android:id="@+id/btn_control_list"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:text="PE"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:textColor="#FF5722"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:background="?attr/selectableItemBackgroundBorderless" />
+                    </FrameLayout>
+
+                    <!-- Kapsam Dışı Butonu -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_scope_out"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginEnd="8dp"
+                        android:backgroundTint="@android:color/transparent"
+                        android:contentDescription="Kapsam Dışı"
+                        android:insetLeft="0dp"
+                        android:insetTop="0dp"
+                        android:insetRight="0dp"
+                        android:insetBottom="0dp"
+                        android:text="K"
+                        android:textSize="24sp"
+                        android:textStyle="bold"
+                        android:textColor="#4CAF50"
+                        app:cornerRadius="28dp"
+                        app:elevation="0dp" />
+
+                    <!-- Cihaz Ekle Butonu -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_add_device"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_marginEnd="8dp"
+                        android:backgroundTint="@android:color/transparent"
+                        android:contentDescription="Cihaz Ekle"
+                        android:insetLeft="0dp"
+                        android:insetTop="0dp"
+                        android:insetRight="0dp"
+                        android:insetBottom="0dp"
+                        app:cornerRadius="28dp"
+                        app:elevation="0dp"
+                        app:icon="@drawable/ic_add"
+                        app:iconGravity="textStart"
+                        app:iconPadding="0dp"
+                        app:iconSize="28dp"
+                        app:iconTint="@color/colorPrimary" />
+
+                    <!-- QR Tarama Butonu -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_qr_scan"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:backgroundTint="@android:color/transparent"
+                        android:contentDescription="QR Tarama"
+                        android:insetLeft="0dp"
+                        android:insetTop="0dp"
+                        android:insetRight="0dp"
+                        android:insetBottom="0dp"
+                        app:cornerRadius="28dp"
+                        app:elevation="0dp"
+                        app:icon="@drawable/ic_camera"
+                        app:iconGravity="textStart"
+                        app:iconPadding="0dp"
+                        app:iconSize="28dp"
+                        app:iconTint="@color/colorPrimary" />
+                </LinearLayout>
+            </HorizontalScrollView>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
