@@ -156,7 +156,7 @@
                 android:layout_width="36dp"
                 android:layout_height="36dp"
                 android:layout_marginEnd="8dp"
-                app:cardBackgroundColor="@color/colorPrimary"
+                app:cardBackgroundColor="@color/buttonPrimary"
                 app:cardCornerRadius="18dp"
                 app:cardElevation="0dp"
                 app:layout_constraintBottom_toBottomOf="@+id/tabsRecyclerView"
@@ -170,7 +170,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Yeni Sekme"
                     android:padding="6dp"
-                    android:tint="@color/white"
+                    android:tint="@color/buttonText"
                     android:src="@drawable/ic_add" />
             </com.google.android.material.card.MaterialCardView>
 
@@ -178,18 +178,56 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Arama Menüsü Container -->
+    <!-- Arama Menüsü Container - Sekmelerin altında -->
     <LinearLayout
         android:id="@+id/searchMenuContainer"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/appBarLayout">
         
+        <!-- İlk EditText -->
+        <EditText
+            android:id="@+id/searchEditText1"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_edittext"
+            android:hint="Arama 1"
+            android:inputType="text"
+            android:padding="8dp"
+            android:textColor="@color/tabTextActive"
+            android:textColorHint="@color/tabTextInactive"
+            android:textSize="12sp" />
+            
         <!-- Sadece arama butonu -->
-        <include layout="@layout/search_button_layout" />
+        <include layout="@layout/search_button_layout" 
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"/>
+        
+        <!-- İkinci EditText -->
+        <EditText
+            android:id="@+id/searchEditText2"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_edittext"
+            android:hint="Arama 2"
+            android:inputType="text"
+            android:padding="8dp"
+            android:textColor="@color/tabTextActive"
+            android:textColorHint="@color/tabTextInactive"
+            android:textSize="12sp" />
+            
     </LinearLayout>
 
     <!-- İçerik Alanı - ViewPager2 -->
@@ -209,8 +247,8 @@
         android:layout_height="wrap_content"
         android:indeterminate="true"
         android:visibility="gone"
-        app:indicatorColor="@color/colorPrimary"
-        app:trackColor="@color/addressBarBackground"
+        app:indicatorColor="@color/buttonPrimary"
+        app:trackColor="@color/editTextBackground"
         app:trackThickness="3dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -247,14 +285,14 @@
                 android:insetRight="0dp"
                 android:insetBottom="0dp"
                 android:padding="0dp"
-                app:backgroundTint="@color/colorPrimary"
+                app:backgroundTint="@color/buttonPrimary"
                 app:cornerRadius="20dp"
                 app:elevation="2dp"
                 app:icon="@drawable/ic_menu"
                 app:iconGravity="textStart"
                 app:iconPadding="0dp"
                 app:iconSize="18dp"
-                app:iconTint="@color/white" />
+                app:iconTint="@color/buttonText" />
 
             <!-- Açılabilir/kapanabilir menü bölümü -->
             <HorizontalScrollView
@@ -350,7 +388,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="28dp"
-                        app:iconTint="@color/colorPrimary" />
+                        app:iconTint="@color/buttonPrimary" />
 
                     <!-- QR Tarama Butonu -->
                     <com.google.android.material.button.MaterialButton
@@ -369,7 +407,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="28dp"
-                        app:iconTint="@color/colorPrimary" />
+                        app:iconTint="@color/buttonPrimary" />
                 </LinearLayout>
             </HorizontalScrollView>
         </LinearLayout>

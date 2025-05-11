@@ -49,6 +49,15 @@ Referans: Material Design 3 Dark Theme, Material Color System
     <color name="iconTint">#BDC1C6</color>
     <color name="iconTintActive">#8AB4F8</color>
     
+    <!-- EditText renkleri - Karanlık Mod -->
+    <color name="editTextBackground">#2D2D2D</color>
+    <color name="editTextBorder">#3C4043</color>
+    
+    <!-- Buton renkleri - Modern Indigo Temaları (Karanlık Mod) -->
+    <color name="buttonPrimary">#9093FF</color>
+    <color name="buttonPrimaryHover">#7C7FFF</color>
+    <color name="buttonText">#FFFFFF</color>
+    
     <!-- PersonAdapter için eksik renkler - Karanlık Mod -->
     <color name="selected_item_bg">#1E2027</color>
     <color name="highlighted_item_bg">#262D36</color>

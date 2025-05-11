@@ -49,6 +49,15 @@ Referans: Material Design 3 Color System, Material Theme Builder
     <color name="iconTint">#5F6368</color>
     <color name="iconTintActive">#4285F4</color>
     
+    <!-- EditText renkleri -->
+    <color name="editTextBackground">#FAFAFA</color>
+    <color name="editTextBorder">#E0E0E0</color>
+    
+    <!-- Buton renkleri - Modern Indigo Temaları -->
+    <color name="buttonPrimary">#6366F1</color>
+    <color name="buttonPrimaryHover">#4F46E5</color>
+    <color name="buttonText">#FFFFFF</color>
+    
     <!-- PersonAdapter için eksik renkler -->
     <color name="selected_item_bg">#E3F2FD</color>
     <color name="highlighted_item_bg">#BBDEFB</color>

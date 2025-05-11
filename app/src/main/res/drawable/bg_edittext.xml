@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- EditText arkaplan tasarımı - Tema Uyumlu, Minimal ve Modern -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    
+    <!-- Arka plan rengi - tema uyumlu -->
+    <solid android:color="@color/editTextBackground" />
+    
+    <!-- Kenar çizgisi - tema uyumlu, ince -->
+    <stroke
+        android:width="0.5dp"
+        android:color="@color/editTextBorder" />
+    
+    <!-- Köşe yuvarlaklığı - daha az yuvarlaklık, modern -->
+    <corners android:radius="6dp" />
+    
+    <!-- İç boşluk - minimal -->
+    <padding
+        android:left="12dp"
+        android:top="4dp"
+        android:right="12dp"
+        android:bottom="4dp" />
+</shape>
