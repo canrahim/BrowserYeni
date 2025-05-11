@@ -89,6 +89,31 @@ class TopraklamaControlActivity : AppCompatActivity() {
         "70px", "130px", "100px", "100px"
     )
     
+    /**
+     * DataHolder'dan URL'yi al ve güncelle
+     * MainActivity'de WebView içeriği kontrol edilip urltoprak değişkeni güncellenir
+     */
+    private fun updateUrlFromDataHolder() {
+        println("updateUrlFromDataHolder çağrıldı")
+        println("updateUrlFromDataHolder - DataHolder.urltoprak: '${DataHolder.urltoprak}'")
+        println("updateUrlFromDataHolder - editTextUrl current text: '${editTextUrl.text}'")
+        
+        if (DataHolder.urltoprak.isNotEmpty()) {
+            // urltoprak varsa bunu kullan
+            if (editTextUrl.text.toString() != DataHolder.urltoprak) {
+                editTextUrl.setText(DataHolder.urltoprak)
+                println("updateUrlFromDataHolder - URL güncellendi: '${DataHolder.urltoprak}'")
+                
+                // UI'da kullanıcıya bilgi ver
+                Toast.makeText(this, "Topraklama Tesisatı sayfasından URL alındı", Toast.LENGTH_SHORT).show()
+            } else {
+                println("updateUrlFromDataHolder - URL zaten aynı, değiştirilmedi")
+            }
+        } else {
+            println("updateUrlFromDataHolder - urltoprak boş, hiçbir şey yapılmadı")
+        }
+    }
+    
     // Sütun genişliği uygulamak için yeniden deneme mekanizması
     private val MAX_RETRY_COUNT = 5
     private val RETRY_DELAY_MS = 500L
@@ -106,18 +131,36 @@ class TopraklamaControlActivity : AppCompatActivity() {
         setupWebView()
         setupClickListeners()
         setupTouchHandling()
+        
+        // Önce saved instance state'i restore et
         restoreState(savedInstanceState)
 
         // URL'yi Shared Preferences'tan yükle
         val prefs = getSharedPreferences("TopraklamaControlPrefs", Context.MODE_PRIVATE)
         val lastUrl = prefs.getString("lastUrl", "") ?: "" // Varsayılan olarak boş dize
         
-        // DataHolder'dan URL'yi al eğer varsa, yoksa Shared Preferences'tan al
-        if (DataHolder.topraklama.isNotEmpty()) {
+        // Önce DataHolder'daki urltoprak'tan kontrol et
+        if (DataHolder.urltoprak.isNotEmpty()) {
+            editTextUrl.setText(DataHolder.urltoprak)
+            Toast.makeText(this, "Topraklama Tesisatı sayfasından URL alındı", Toast.LENGTH_SHORT).show()
+            println("onCreate - urltoprak kullanıldı: '${DataHolder.urltoprak}'")
+        } else if (DataHolder.topraklama.isNotEmpty()) {
+            // Eğer urltoprak yoksa, topraklama'dan gelen en son URL'yi kullan
             editTextUrl.setText(DataHolder.topraklama)
+            println("onCreate - topraklama kullanıldı: '${DataHolder.topraklama}'")
         } else {
-            editTextUrl.setText(lastUrl)
+            // Eğer diğer değerlerden sonra hala boşsa, Shared Preferences'tan yükle
+            // restoreState zaten kontrol etmiş olduğu için tekrar yazmaya gerek yok
+            if (editTextUrl.text.toString().isEmpty()) {
+                editTextUrl.setText(lastUrl)
+                println("onCreate - lastUrl kullanıldı: '$lastUrl'")
+            } else {
+                println("onCreate - Text zaten doldurulmuş: '${editTextUrl.text}'")
+            }
         }
+        
+        // Son durum kontrolu
+        println("onCreate - Final editTextUrl: '${editTextUrl.text}'")
 
         // Sayfa otomatik olarak yüklensin
         loadWebPage()
@@ -1216,12 +1259,11 @@ class TopraklamaControlActivity : AppCompatActivity() {
         savedInstanceState?.let { bundle ->
             val savedUrl = bundle.getString(KEY_URL)
             savedUrl?.let {
-                editTextUrl.setText(it)
+                // Sadece DataHolder'da değer yoksa restore et
+                if (DataHolder.urltoprak.isEmpty() && DataHolder.topraklama.isEmpty()) {
+                    editTextUrl.setText(it)
+                }
             }
-        }
-
-        if (DataHolder.topraklama.isNotEmpty()) {
-            editTextUrl.setText(DataHolder.topraklama)
         }
     }
     
@@ -1304,6 +1346,15 @@ class TopraklamaControlActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        
+        // Aktivite yeniden aktif olduğunda DataHolder'daki değerleri logla
+        println("TopraklamaControlActivity.onResume - DataHolder.urltoprak: '${DataHolder.urltoprak}'")
+        println("TopraklamaControlActivity.onResume - DataHolder.topraklama: '${DataHolder.topraklama}'")
+        println("TopraklamaControlActivity.onResume - editTextUrl current text: '${editTextUrl.text}'")
+        
+        // DataHolder'daki değerleri kontrol et
+        updateUrlFromDataHolder()
+        
         // WebView yeniden başlatma işlemlerini yap
         webView?.onResume() ?: run {
             // WebView yoksa yeniden oluşturmayı dene

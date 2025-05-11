@@ -33,6 +33,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.asforce.asforcebrowser.util.DataHolder
+import android.widget.Toast
 
 /**
  * MainActivity - Ana ekran
@@ -563,6 +564,11 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         super.onResume()
         // Context'i güncelle
         downloadManager.updateContext(this)
+        
+        // DataHolder değerlerini kontrol et ve logla
+        println("onResume - DataHolder.urltoprak: '${DataHolder.urltoprak}'")
+        println("onResume - DataHolder.topraklama: '${DataHolder.topraklama}'")
+        println("onResume - DataHolder.url: '${DataHolder.url}'")
     }
 
     /**
@@ -579,6 +585,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             
             // Log ekle
             println("DataHolder.url güncellendi: $lastDigits")
+            
+            // WebView içeriğini kontrol et, "Topraklama Tesisatı" var mı?
+            checkContentForTopraklama(url, lastDigits)
         }
     }
     
@@ -615,6 +624,104 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             // Hata durumunda boş string döndür
             println("URL'den rakam çıkarılırken hata: ${e.message}")
             return ""
+        }
+    }
+    
+    /**
+     * WebView içeriğinde "Topraklama Tesisatı" metni olup olmadığını kontrol eder
+     * Eğer varsa, URL'nin son rakamlarını DataHolder'daki urltoprak'a kaydeder
+     */
+    private fun checkContentForTopraklama(url: String, lastDigits: String) {
+        // Log ekleyelim
+        println("checkContentForTopraklama çağrıldı - URL: $url, LastDigits: $lastDigits")
+        
+        // Aktif sekmedeki WebView'i al
+        val currentTab = viewModel.activeTab.value ?: run {
+            println("currentTab is null")
+            return
+        }
+        
+        val fragment = pagerAdapter.getFragmentByTabId(currentTab.id) ?: run {
+            println("fragment is null for tabId: ${currentTab.id}")
+            return
+        }
+        
+        val webView = fragment.getWebView() ?: run {
+            println("webView is null")
+            return
+        }
+        
+        // JavaScript ile sayfa içeriğinde "Topraklama Tesisatı" ara
+        val checkContentScript = """
+            (function() {
+                console.log('Sayfa içeriği kontrol ediliyor...');
+                var content = document.documentElement.innerHTML.toLowerCase();
+                var found = content.indexOf('topraklama tesisat') !== -1 || content.indexOf('topraklama tesisatı') !== -1;
+                
+                console.log('Böylelikle: ' + found);
+                
+                if (found) {
+                    // Daha spesifik kontrol: <p class="form-control-static">Topraklama Tesisatı</p>
+                    var elements = document.querySelectorAll('p.form-control-static');
+                    console.log('p.form-control-static elementleri: ' + elements.length);
+                    
+                    for (var i = 0; i < elements.length; i++) {
+                        var text = elements[i].textContent.trim().toLowerCase();
+                        console.log('Element ' + i + ' text: "' + text + '"');
+                        
+                        if (text === 'topraklama tesisatı') {
+                            console.log('BULUNDU: Topraklama Tesisatı spesifik olarak bulundu!');
+                            return {found: true, specific: true};
+                        }
+                    }
+                    
+                    // Alternatif kontrol
+                    console.log('Özel format bulunamadı, genel kontrol yapılıyor...');
+                    return {found: true, specific: false};
+                }
+                
+                return {found: false, specific: false};
+            })();
+        """.trimIndent()
+        
+        webView.evaluateJavascript(checkContentScript) { result ->
+            println("JavaScript sonucu: $result")
+            
+            try {
+                // Result'u parse et
+                val cleanResult = result.replace("^\"|\"$".toRegex(), "")
+                val jsonResult = org.json.JSONObject(cleanResult)
+                val found = jsonResult.optBoolean("found", false)
+                val specific = jsonResult.optBoolean("specific", false)
+                
+                println("Found: $found, Specific: $specific")
+                
+                if (found && specific) {
+                    // "Topraklama Tesisatı" bulundu, URL'nin rakamlarını kaydet
+                    DataHolder.urltoprak = lastDigits
+                    println("Topraklama Tesisatı bulundu! DataHolder.urltoprak güncellendi: $lastDigits")
+                    
+                    // UI'da bildirim gösterme (isteğe bağlı)
+                    runOnUiThread {
+                        Toast.makeText(this, "Topraklama Tesisatı sayfası tespit edildi", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    println("Bu sayfada Topraklama Tesisatı bulunamadı (found=$found, specific=$specific)")
+                }
+            } catch (e: Exception) {
+                println("JavaScript sonucunu parse etme hatası: ${e.message}")
+                println("Orijinal sonuc: $result")
+                
+                // Basit kontrol de yapalım
+                if (result.contains("true") && result.contains("specific")) {
+                    DataHolder.urltoprak = lastDigits
+                    println("Basit kontrol ile Topraklama Tesisatı bulundu! DataHolder.urltoprak güncellendi: $lastDigits")
+                    
+                    runOnUiThread {
+                        Toast.makeText(this, "Topraklama Tesisatı sayfası tespit edildi", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
     

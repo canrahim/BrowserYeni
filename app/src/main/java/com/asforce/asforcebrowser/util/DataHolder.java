@@ -7,6 +7,7 @@ public class DataHolder {
     public static String url = "";
     public static String measuredLocation0 = "";
     public static String topraklama = ""; // Topraklama ekranı için URL
+    public static String urltoprak = ""; // WebView'de "Topraklama Tesisatı" bulunan sekmerin URL'indeki rakamlar
     
     // Form değerleri için alanlar
     public static String continuity = "0.09";
