@@ -5,6 +5,9 @@ import android.content.Context
 import android.webkit.WebView
 import android.os.Handler
 import android.os.Looper
+import android.webkit.WebChromeClient
+import android.webkit.ValueCallback
+import android.net.Uri
 
 /**
  * Custom WebView for tabs

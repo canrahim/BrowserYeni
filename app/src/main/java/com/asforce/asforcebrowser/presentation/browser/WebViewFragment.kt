@@ -11,6 +11,15 @@ import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import android.content.Intent
+import android.content.Context
+import android.net.Uri
+import android.provider.MediaStore
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 import com.asforce.asforcebrowser.databinding.FragmentWebViewBinding
 import com.asforce.asforcebrowser.util.configure
 import com.asforce.asforcebrowser.util.normalizeUrl
@@ -47,6 +56,52 @@ class WebViewFragment : Fragment() {
     private lateinit var pageLoadOptimizer: PageLoadOptimizer
     private lateinit var menuOptimizer: MenuOptimizer
     private lateinit var webViewDownloadHelper: WebViewDownloadHelper
+
+    // Dosya seçimi için değişkenler
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var cameraPhotoPath: String? = null
+    
+    // Kamera ile fotoğraf çekme ve galeriden dosya seçme sonuçları için
+    private val getContentLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            filePathCallback?.onReceiveValue(arrayOf(uri))
+        } else {
+            filePathCallback?.onReceiveValue(null)
+        }
+        filePathCallback = null
+    }
+    
+    // Kamera ile fotoğraf çekme sonuçları için
+    private val takePictureLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        try {
+            if (success && cameraPhotoPath != null) {
+                // FileProvider kullanarak güvenli URI oluştur
+                val photoFile = File(cameraPhotoPath!!)
+                if (photoFile.exists() && photoFile.length() > 0) {
+                    val photoUri = FileProvider.getUriForFile(
+                        requireContext(),
+                        "${requireContext().packageName}.fileprovider",
+                        photoFile
+                    )
+                    filePathCallback?.onReceiveValue(arrayOf(photoUri))
+                } else {
+                    // Dosya yoksa veya boşsa null dön
+                    filePathCallback?.onReceiveValue(null) 
+                }
+            } else {
+                filePathCallback?.onReceiveValue(null)
+            }
+        } catch (e: Exception) {
+            println("Fotoğraf sonucu işlenirken hata: ${e.message}")
+            filePathCallback?.onReceiveValue(null)
+        } finally {
+            filePathCallback = null
+        }
+    }
 
     // WebViewClient - Sayfa yükleme ve URL değişimleri için
     private val webViewClient = object : WebViewClient() {
@@ -100,6 +155,36 @@ class WebViewFragment : Fragment() {
                     val url = view?.url ?: initialUrl
                     viewModel.updateTab(tabId, url, it, null)
                 }
+            }
+        }
+        
+        /**
+         * Dosya seçim dialog'unu gösterir (input[type=file] için)
+         * Camera, galeri ve dosya seçim işlemleri burada yönetilir
+         * 
+         * Referans: Android WebView
+         * URL: https://developer.android.com/reference/android/webkit/WebChromeClient#onShowFileChooser
+         */
+        override fun onShowFileChooser(
+            webView: WebView?, 
+            filePathCallback: ValueCallback<Array<Uri>>?, 
+            fileChooserParams: FileChooserParams?
+        ): Boolean {
+            // Önceki callback'i iptal et
+            this@WebViewFragment.filePathCallback?.onReceiveValue(null)
+            this@WebViewFragment.filePathCallback = filePathCallback
+            
+            val context = requireContext()
+            
+            try {
+                // Seçim dialog'unu göster
+                showFileChooserDialog(context, fileChooserParams)
+                return true
+            } catch (e: Exception) {
+                println("Dosya seçici açılamadı: ${e.message}")
+                filePathCallback?.onReceiveValue(null)
+                this@WebViewFragment.filePathCallback = null
+                return false
             }
         }
 
@@ -437,6 +522,103 @@ class WebViewFragment : Fragment() {
      */
     fun getWebView(): WebView? {
         return if (_binding != null) binding.webView else null
+    }
+    
+    /**
+     * Geçici kamera fotoğraf dosyası oluşturur
+     * @return Oluşturulan geçici dosyanın URI'si
+     */
+    /**
+     * Geçici kamera fotoğraf dosyası oluşturur
+     * @return Oluşturulan geçici dosyanın URI'si
+     */
+    private fun createTempImageFileUri(): Uri? {
+        try {
+            val context = requireContext()
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val imageFileName = "JPEG_${timeStamp}_"
+            val storageDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
+            
+            // Storage klasörü var mı kontrol et
+            if (storageDir == null || !storageDir.exists()) {
+                println("Depolama dizini bulunamadı veya erişilemez")
+                return null
+            }
+            
+            // Geçici dosya oluştur
+            val imageFile = File.createTempFile(imageFileName, ".jpg", storageDir)
+            cameraPhotoPath = imageFile.absolutePath
+            
+            // FileProvider URI oluştur
+            val authority = "${context.packageName}.fileprovider"
+            return FileProvider.getUriForFile(context, authority, imageFile)
+        } catch (e: Exception) {
+            println("Geçici fotoğraf dosyası oluşturulamadı: ${e.message}")
+            return null
+        }
+    }
+    
+    /**
+     * Dosya seçim dialog'unu gösterir
+     * Kamera, galeri ve dosya seçeneklerini sunar
+     */
+    private fun showFileChooserDialog(context: Context, fileChooserParams: WebChromeClient.FileChooserParams?) {
+        val options = arrayOf("Kamera", "Galeri/Dosyalar")
+
+        androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle("Görüntü veya Dosya Seç")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> { // Kamera
+                        takePictureWithCamera()
+                    }
+                    1 -> { // Galeri/Dosyalar
+                        // Kabul edilen mimetype'ları al
+                        val acceptTypes = fileChooserParams?.acceptTypes ?: arrayOf("*/*")
+                        var mimeType = "*/*"
+                        
+                        // Eğer özel mime type belirtilmişse kullan
+                        if (acceptTypes.isNotEmpty() && acceptTypes[0].isNotEmpty() && acceptTypes[0] != "*/*") {
+                            mimeType = acceptTypes[0]
+                        }
+                        
+                        // Dosya/resim seçiciyi aç
+                        getContentLauncher.launch(mimeType)
+                    }
+                }
+            }
+            .setOnCancelListener {
+                // Kullanıcı iptal ederse callback'i null ile çağır
+                filePathCallback?.onReceiveValue(null)
+                filePathCallback = null
+            }
+            .show()
+    }
+    
+    /**
+     * Kamera ile fotoğraf çekme işlemini başlatır
+     */
+    /**
+     * Kamera ile fotoğraf çekme işlemini başlatır
+     * Güvenli null kontrolleri ile fotoğraf URI'si oluşturur
+     */
+    private fun takePictureWithCamera() {
+        try {
+            val photoUri = createTempImageFileUri()
+            
+            if (photoUri != null) {
+                takePictureLauncher.launch(photoUri)
+            } else {
+                // Fotoğraf URI'si oluşturulamazsa callback'i iptal et
+                filePathCallback?.onReceiveValue(null)
+                filePathCallback = null
+            }
+        } catch (e: Exception) {
+            // Herhangi bir hata durumunda güvenli şekilde iptal et
+            println("Kamera başlatılırken hata: ${e.message}")
+            filePathCallback?.onReceiveValue(null)
+            filePathCallback = null
+        }
     }
 
     override fun onDestroy() {

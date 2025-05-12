@@ -70,6 +70,7 @@
             android:exported="false" />
         
         <!-- FileProvider for file access -->
+        <!-- FileProvider for file access -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
