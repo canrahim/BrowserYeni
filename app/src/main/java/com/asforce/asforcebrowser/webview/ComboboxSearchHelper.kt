@@ -12,7 +12,7 @@ class ComboboxSearchHelper(private val webView: WebView) {
 
     /**
      * Search all comboboxes in the WebView for items matching the search text
-     * 
+     *
      * @param searchText Text to search for
      * @param onItemFound Callback called when a matching item is found and selected
      * @param onSearchComplete Callback called when the search is complete
@@ -28,10 +28,13 @@ class ComboboxSearchHelper(private val webView: WebView) {
             onNoResults?.invoke()
             return
         }
-        
+
         // Normalize the search text for case-insensitive, accent-insensitive comparison
         val normalizedSearchText = normalizeText(searchText)
-        
+
+        // Debug: log the search term and normalized form
+        android.util.Log.d("ComboboxSearch", "Arama terimi: '$searchText', Normalized: '$normalizedSearchText'")
+
         // Script to find and check all comboboxes in the page
         val searchScript = """
         (function() {
@@ -64,6 +67,29 @@ class ComboboxSearchHelper(private val webView: WebView) {
                 normalizedText = normalizedText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                 
                 return normalizedText;
+            }
+            
+            // Check if string exactly matches a whole word at the beginning of text
+            function exactWordMatch(haystack, needle) {
+                if (!haystack || !needle) return false;
+                
+                // If they are exactly the same
+                if (haystack === needle) return true;
+                
+                // If needle is at the start of haystack followed by space/punctuation
+                if (haystack.startsWith(needle)) {
+                    // If needle is followed by space, punctuation, or end of string
+                    if (haystack.length === needle.length) {
+                        return true;
+                    }
+                    
+                    var nextChar = haystack.charAt(needle.length);
+                    return nextChar === ' ' || nextChar === ',' || nextChar === '.' || 
+                           nextChar === ';' || nextChar === ':' || nextChar === '-' || 
+                           nextChar === '(' || nextChar === ')' || nextChar === '/';
+                }
+                
+                return false;
             }
             
             // Result object to store search results
@@ -131,12 +157,19 @@ class ComboboxSearchHelper(private val webView: WebView) {
                         // Normalize the option text for comparison
                         const normalizedOptionText = normalizeText(optionText);
                         
-                        // Debug log to see actual comparison
-                        console.log('Comparing: "' + optionText + '" normalized as "' + normalizedOptionText + '"');
+                        // Logging the actual comparison
+                        console.log('Comparing options: "' + optionText + '" normalized="' + normalizedOptionText + '" with "${normalizedSearchText}"');
+                        console.log('Exact word match result:', exactWordMatch(normalizedOptionText, '${normalizedSearchText}'));
                         
-                        // First try direct equality for better matching
-                        if (normalizedOptionText === '${normalizedSearchText}') {
-                            console.log('EXACT MATCH FOUND!');
+        // First try exact word match for stronger matching
+                        if (exactWordMatch(normalizedOptionText, '${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor: ' + optionText);
+                                continue;
+                            }
+                            
+                            console.log('EXACT WORD MATCH FOUND!');
                             matchFound = true;
                             matchIndex = j;
                             matchesFound++;
@@ -164,7 +197,7 @@ class ComboboxSearchHelper(private val webView: WebView) {
                                 }
                                 
                                 // Scroll to the element to make it visible
-                                select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                //select.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 
                                 // Apply the selection but force dropdown to close
                                 setTimeout(function() {
@@ -188,8 +221,74 @@ class ComboboxSearchHelper(private val webView: WebView) {
                             
                             break; // Stop after first match in this combobox
                         }
-                        // Then try includes() for partial matching
+                        // Then check for word match at beginning followed by space or punctuation
+                        else if (normalizedOptionText.startsWith('${normalizedSearchText} ')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor: ' + optionText);
+                                continue;
+                            }
+                            
+                            console.log('WORD START MATCH FOUND!');
+                            matchFound = true;
+                            matchIndex = j;
+                            matchesFound++;
+                            
+                            // Store match details
+                            result.details.push({
+                                comboboxName: comboboxName,
+                                matchedItem: optionText,
+                                originalIndex: j,
+                                matchType: 'word_start'
+                            });
+                            
+                            // Try to select this option
+                            try {
+                                // Set the value directly
+                                select.selectedIndex = j;
+                                
+                                // Trigger change event
+                                const event = new Event('change', { bubbles: true });
+                                select.dispatchEvent(event);
+                                
+                                // Update select picker if Bootstrap is used
+                                if (typeof $ !== 'undefined' && $('.selectpicker').length > 0) {
+                                    $(select).selectpicker('refresh');
+                                }
+                                
+                                // Scroll to the element to make it visible
+                                //select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                
+                                // Apply the selection but force dropdown to close
+                                setTimeout(function() {
+                                    // Force close all dropdowns
+                                    // 1. Blur the select
+                                    select.blur();
+                                    // 2. Click outside
+                                    document.body.click();
+                                    // 3. Escape key to close dropdowns
+                                    document.dispatchEvent(new KeyboardEvent('keydown', {
+                                        key: 'Escape',
+                                        code: 'Escape',
+                                        keyCode: 27,
+                                        which: 27,
+                                        bubbles: true
+                                    }));
+                                }, 200);
+                            } catch (e) {
+                                console.error('Error selecting option:', e);
+                            }
+                            
+                            break; // Stop after first match in this combobox
+                        }
+                        // Then try includes() for partial matching only as last resort
                         else if (normalizedOptionText.includes('${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor: ' + optionText);
+                                continue;
+                            }
+                            
                             matchFound = true;
                             matchIndex = j;
                             matchesFound++;
@@ -216,7 +315,7 @@ class ComboboxSearchHelper(private val webView: WebView) {
                                 }
                                 
                                 // Scroll to the element to make it visible
-                                select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                //select.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 
                                 // Apply the selection but force dropdown to close
                                 setTimeout(function() {
@@ -277,8 +376,140 @@ class ComboboxSearchHelper(private val webView: WebView) {
                         // Normalize the option text for comparison
                         const normalizedOptionText = normalizeText(optionText);
                         
-                        // Check if the option text contains the search text
-                        if (normalizedOptionText.includes('${normalizedSearchText}')) {
+                        // First try exact match
+                        if (exactWordMatch(normalizedOptionText, '${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Bootstrap): ' + optionText);
+                                continue;
+                            }
+                            
+                            console.log('EXACT WORD MATCH FOUND IN BOOTSTRAP!');
+                            matchFound = true;
+                            matchIndex = j;
+                            matchesFound++;
+                            
+                            // Store match details
+                            result.details.push({
+                                comboboxName: comboboxName,
+                                matchedItem: optionText,
+                                originalIndex: j,
+                                matchType: 'exact'
+                            });
+                            
+                            // Try to select this option
+                            try {
+                                // Set the value directly on the hidden select
+                                selectElement.selectedIndex = j;
+                                
+                                // Trigger change event
+                                const event = new Event('change', { bubbles: true });
+                                selectElement.dispatchEvent(event);
+                                
+                                // Update the Bootstrap selectpicker
+                                if (typeof $ !== 'undefined') {
+                                $(selectElement).selectpicker('val', option.value);
+                                $(selectElement).selectpicker('refresh');
+                                
+                                // Instead of opening and closing the dropdown, just force it closed
+                                setTimeout(function() {
+                                    // Force dropdown to close
+                                // 1. Blur
+                                    selectElement.blur();
+                                        // 2. Click outside
+                                            document.body.click();
+                                            // 3. Escape key event
+                                            document.dispatchEvent(new KeyboardEvent('keydown', {
+                                                key: 'Escape',
+                                                code: 'Escape',
+                                                keyCode: 27,
+                                                which: 27,
+                                                bubbles: true
+                                            }));
+                                            // 4. Use Bootstrap's API to close the dropdown
+                                            $('.dropdown-toggle').dropdown('hide');
+                                        }, 300);
+                                    }
+                                
+                                // Make the select visible
+                                //dropdownToggle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } catch (e) {
+                                console.error('Error selecting Bootstrap option:', e);
+                            }
+                            
+                            break; // Stop after first match in this combobox
+                        }
+                        // Then check for word match at beginning followed by space or punctuation
+                        else if (normalizedOptionText.startsWith('${normalizedSearchText} ')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Bootstrap): ' + optionText);
+                                continue;
+                            }
+                            
+                            console.log('WORD START MATCH FOUND IN BOOTSTRAP!');
+                            matchFound = true;
+                            matchIndex = j;
+                            matchesFound++;
+                            
+                            // Store match details
+                            result.details.push({
+                                comboboxName: comboboxName,
+                                matchedItem: optionText,
+                                originalIndex: j,
+                                matchType: 'word_start'
+                            });
+                            
+                            // Try to select this option
+                            try {
+                                // Set the value directly on the hidden select
+                                selectElement.selectedIndex = j;
+                                
+                                // Trigger change event
+                                const event = new Event('change', { bubbles: true });
+                                selectElement.dispatchEvent(event);
+                                
+                                // Update the Bootstrap selectpicker
+                                if (typeof $ !== 'undefined') {
+                                $(selectElement).selectpicker('val', option.value);
+                                $(selectElement).selectpicker('refresh');
+                                
+                                // Instead of opening and closing the dropdown, just force it closed
+                                setTimeout(function() {
+                                    // Force dropdown to close
+                                // 1. Blur
+                                    selectElement.blur();
+                                        // 2. Click outside
+                                            document.body.click();
+                                            // 3. Escape key event
+                                            document.dispatchEvent(new KeyboardEvent('keydown', {
+                                                key: 'Escape',
+                                                code: 'Escape',
+                                                keyCode: 27,
+                                                which: 27,
+                                                bubbles: true
+                                            }));
+                                            // 4. Use Bootstrap's API to close the dropdown
+                                            $('.dropdown-toggle').dropdown('hide');
+                                        }, 300);
+                                    }
+                                
+                                // Make the select visible
+                                //dropdownToggle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } catch (e) {
+                                console.error('Error selecting Bootstrap option:', e);
+                            }
+                            
+                            break; // Stop after first match in this combobox
+                        }
+                        // Check if the option text contains the search text as last resort
+                        else if (normalizedOptionText.includes('${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Bootstrap): ' + optionText);
+                                continue;
+                            }
+                            
                             matchFound = true;
                             matchIndex = j;
                             matchesFound++;
@@ -383,8 +614,146 @@ class ComboboxSearchHelper(private val webView: WebView) {
                         // Normalize the option text for comparison
                         const normalizedOptionText = normalizeText(optionText);
                         
-                        // Check if the option text contains the search text
-                        if (normalizedOptionText.includes('${normalizedSearchText}')) {
+                        // First try exact word match for stronger matching
+                        if (exactWordMatch(normalizedOptionText, '${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Select2): ' + optionText);
+                                continue;
+                            }
+                            
+                            console.log('EXACT WORD MATCH FOUND IN SELECT2!');
+                            matchFound = true;
+                            matchIndex = j;
+                            matchesFound++;
+                            
+                            // Store match details
+                            result.details.push({
+                                comboboxName: comboboxName,
+                                matchedItem: optionText,
+                                originalIndex: j,
+                                matchType: 'exact'
+                            });
+                            
+                            // Try to select this option
+                            try {
+                                // Set the value directly on the original select
+                                selectElement.selectedIndex = j;
+                                
+                                // Trigger change event
+                                const event = new Event('change', { bubbles: true });
+                                selectElement.dispatchEvent(event);
+                                
+                                // Update select2 if jQuery is available
+                                if (typeof $ !== 'undefined') {
+                                    $(selectElement).trigger('change.select2');
+                                    
+                                    // Force the select2 dropdown to close
+                                    setTimeout(function() {
+                                        // Make sure dropdown is closed
+                                        try {
+                                            // 1. Use select2's API to close
+                                            $(selectElement).select2('close');
+                                            
+                                            // 2. Click outside
+                                            document.body.click();
+                                            
+                                            // 3. Escape key
+                                            document.dispatchEvent(new KeyboardEvent('keydown', {
+                                                key: 'Escape',
+                                                code: 'Escape',
+                                                keyCode: 27,
+                                                which: 27,
+                                                bubbles: true
+                                            }));
+                                        } catch(e) {
+                                            console.error('Error closing select2 dropdown:', e);
+                                        }
+                                    }, 300);
+                                }
+                                
+                                // Make the dropdown visible
+                                //select2Container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } catch (e) {
+                                console.error('Error selecting Select2 option:', e);
+                            }
+                            
+                            break; // Stop after first match in this combobox
+                        }
+                        // Then check for word match at beginning followed by space or punctuation
+                        else if (normalizedOptionText.startsWith('${normalizedSearchText} ')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Select2): ' + optionText);
+                                continue;
+                            }
+                            
+                            console.log('WORD START MATCH FOUND IN SELECT2!');
+                            matchFound = true;
+                            matchIndex = j;
+                            matchesFound++;
+                            
+                            // Store match details
+                            result.details.push({
+                                comboboxName: comboboxName,
+                                matchedItem: optionText,
+                                originalIndex: j,
+                                matchType: 'word_start'
+                            });
+                            
+                            // Try to select this option
+                            try {
+                                // Set the value directly on the original select
+                                selectElement.selectedIndex = j;
+                                
+                                // Trigger change event
+                                const event = new Event('change', { bubbles: true });
+                                selectElement.dispatchEvent(event);
+                                
+                                // Update select2 if jQuery is available
+                                if (typeof $ !== 'undefined') {
+                                    $(selectElement).trigger('change.select2');
+                                    
+                                    // Force the select2 dropdown to close
+                                    setTimeout(function() {
+                                        // Make sure dropdown is closed
+                                        try {
+                                            // 1. Use select2's API to close
+                                            $(selectElement).select2('close');
+                                            
+                                            // 2. Click outside
+                                            document.body.click();
+                                            
+                                            // 3. Escape key
+                                            document.dispatchEvent(new KeyboardEvent('keydown', {
+                                                key: 'Escape',
+                                                code: 'Escape',
+                                                keyCode: 27,
+                                                which: 27,
+                                                bubbles: true
+                                            }));
+                                        } catch(e) {
+                                            console.error('Error closing select2 dropdown:', e);
+                                        }
+                                    }, 300);
+                                }
+                                
+                                // Make the dropdown visible
+                                //select2Container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } catch (e) {
+                                console.error('Error selecting Select2 option:', e);
+                            }
+                            
+                            break; // Stop after first match in this combobox
+                        }
+                        // Check if the option text contains the search text as last resort
+                        else if (normalizedOptionText.includes('${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedOptionText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Select2): ' + optionText);
+                                continue;
+                            }
+                            
                             matchFound = true;
                             matchIndex = j;
                             matchesFound++;
@@ -508,8 +877,132 @@ class ComboboxSearchHelper(private val webView: WebView) {
                         // Normalize the item text for comparison
                         const normalizedItemText = normalizeText(itemText);
                         
-                        // Check if the item text contains the search text
-                        if (normalizedItemText.includes('${normalizedSearchText}')) {
+                        // First try exact word match for stronger matching
+                        if (exactWordMatch(normalizedItemText, '${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedItemText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Custom): ' + itemText);
+                                continue;
+                            }
+                            
+                            console.log('EXACT WORD MATCH FOUND IN CUSTOM DROPDOWN!');
+                            matchFound = true;
+                            matchesFound++;
+                            
+                            // Store match details
+                            result.details.push({
+                                comboboxName: comboboxName,
+                                matchedItem: itemText,
+                                originalIndex: j,
+                                matchType: 'exact'
+                            });
+                            
+                            // Try to select this option
+                            try {
+                                // Click the dropdown to open it
+                                dropdown.click();
+                                
+                                // Short delay to let the dropdown open
+                                setTimeout(function() {
+                                    // Click the matching item
+                                    item.element.click();
+                                    
+                                    // Make the dropdown visible
+                                    //dropdown.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    
+                                    // Force close the dropdown after selection
+                                    setTimeout(function() {
+                                        // 1. Click outside
+                                        document.body.click();
+                                        
+                                        // 2. Escape key
+                                        document.dispatchEvent(new KeyboardEvent('keydown', {
+                                            key: 'Escape',
+                                            code: 'Escape',
+                                            keyCode: 27,
+                                            which: 27,
+                                            bubbles: true
+                                        }));
+                                        
+                                        // 3. If jQuery is available, try dropdown API
+                                        if (typeof $ !== 'undefined') {
+                                            $('.dropdown-toggle').dropdown('hide');
+                                        }
+                                    }, 300);
+                                }, 100);
+                            } catch (e) {
+                                console.error('Error selecting custom dropdown item:', e);
+                            }
+                            
+                            break; // Stop after first match
+                        }
+                        // Then check for word match at beginning followed by space or punctuation
+                        else if (normalizedItemText.startsWith('${normalizedSearchText} ')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedItemText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Custom): ' + itemText);
+                                continue;
+                            }
+                            
+                            console.log('WORD START MATCH FOUND IN CUSTOM DROPDOWN!');
+                            matchFound = true;
+                            matchesFound++;
+                            
+                            // Store match details
+                            result.details.push({
+                                comboboxName: comboboxName,
+                                matchedItem: itemText,
+                                originalIndex: j,
+                                matchType: 'word_start'
+                            });
+                            
+                            // Try to select this option
+                            try {
+                                // Click the dropdown to open it
+                                dropdown.click();
+                                
+                                // Short delay to let the dropdown open
+                                setTimeout(function() {
+                                    // Click the matching item
+                                    item.element.click();
+                                    
+                                // Make the dropdown visible
+                                //dropdown.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    
+                                    // Force close the dropdown after selection
+                                    setTimeout(function() {
+                                        // 1. Click outside
+                                        document.body.click();
+                                        
+                                        // 2. Escape key
+                                        document.dispatchEvent(new KeyboardEvent('keydown', {
+                                            key: 'Escape',
+                                            code: 'Escape',
+                                            keyCode: 27,
+                                            which: 27,
+                                            bubbles: true
+                                        }));
+                                        
+                                        // 3. If jQuery is available, try dropdown API
+                                        if (typeof $ !== 'undefined') {
+                                            $('.dropdown-toggle').dropdown('hide');
+                                        }
+                                    }, 300);
+                                }, 100);
+                            } catch (e) {
+                                console.error('Error selecting custom dropdown item:', e);
+                            }
+                            
+                            break; // Stop after first match
+                        }
+                        // Check if the item text contains the search text as last resort
+                        else if (normalizedItemText.includes('${normalizedSearchText}')) {
+                            // United kontrolü - "united" içeriyorsa atla
+                            if (normalizedItemText.includes('united')) {
+                                console.log('"united" içerdiği için atlanıyor (Custom): ' + itemText);
+                                continue;
+                            }
+                            
                             matchFound = true;
                             matchesFound++;
                             
@@ -531,7 +1024,7 @@ class ComboboxSearchHelper(private val webView: WebView) {
                                     item.element.click();
                                     
                                     // Make the dropdown visible
-                                    dropdown.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    //dropdown.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                     
                                     // Force close the dropdown after selection
                                     setTimeout(function() {
@@ -577,19 +1070,19 @@ class ComboboxSearchHelper(private val webView: WebView) {
             }
         })();
         """.trimIndent()
-        
+
         // Execute the search script
         webView.evaluateJavascript(searchScript) { result ->
             try {
                 // Process the result
                 val cleanResult = result.trim().removeSurrounding("\"").replace("\\\"", "\"").replace("\\\\", "\\")
-                
+
                 // Parse the JSON result
                 val jsonResult = org.json.JSONObject(cleanResult)
                 val found = jsonResult.optBoolean("found", false)
                 val totalComboboxes = jsonResult.optInt("totalComboboxes", 0)
                 val matchedComboboxes = jsonResult.optInt("matchedComboboxes", 0)
-                
+
                 if (found) {
                     // Get the details of the matches
                     val detailsArray = jsonResult.optJSONArray("details")
@@ -598,10 +1091,10 @@ class ComboboxSearchHelper(private val webView: WebView) {
                         val firstMatch = detailsArray.getJSONObject(0)
                         val comboboxName = firstMatch.optString("comboboxName", "")
                         val matchedItem = firstMatch.optString("matchedItem", "")
-                        
+
                         // Callback for match found
                         onItemFound?.invoke(comboboxName, matchedItem)
-                        
+
                         // If the select picker needs additional handling
                         enhanceComboboxDisplay()
                     }
@@ -609,19 +1102,262 @@ class ComboboxSearchHelper(private val webView: WebView) {
                     // No matches found
                     onNoResults?.invoke()
                 }
-                
+
                 // Wait a bit and then finalize the search
                 Handler(Looper.getMainLooper()).postDelayed({
                     onSearchComplete?.invoke()
                 }, 500)
-                
+
             } catch (e: Exception) {
                 // Error processing results
                 onNoResults?.invoke()
             }
         }
     }
-    
+
+    /**
+     * Özel olarak "Ünite" kelimesini arayan ve seçen fonksiyon
+     */
+    private fun findAndSelectUnite(
+        onItemFound: ((comboboxName: String, itemText: String) -> Unit)? = null,
+        onSearchComplete: (() -> Unit)? = null,
+        onNoResults: (() -> Unit)? = null
+    ) {
+        val specialScript = """
+        (function() {
+            try {
+                console.log('Özel Ünite arama başlatılıyor...');
+                let result = {
+                    found: false,
+                    comboboxName: '',
+                    matchedItem: ''
+                };
+                
+                // 1. Önce tüm select elementlerini bul
+                const selects = document.querySelectorAll('select');
+                console.log('Toplam ' + selects.length + ' adet select elementi bulundu');
+                
+                // Her bir select içinde "Ünite" kelimesini ara
+                for (let i = 0; i < selects.length; i++) {
+                    const select = selects[i];
+                    if (!select.offsetParent || select.disabled) continue; // Görünür değilse atla
+                    
+                    const options = select.options;
+                    const comboboxName = select.name || select.id || ('combobox_' + i);
+                    console.log('Combobox inceleniyor: ' + comboboxName + ' (' + options.length + ' seçenek)');
+                    
+                    // Her bir option'ı kontrol et
+                    for (let j = 0; j < options.length; j++) {
+                        const option = options[j];
+                        const text = option.text || option.innerHTML || '';
+                        const lowercaseText = text.toLowerCase();
+                        
+                        console.log('Kontrol ediliyor: "' + text + '"');
+                        
+                        // Tamamen eşleşme durumu
+                        if (text === 'Ünite' || text === 'ÜNITE' || text === 'ÜNİTE' || 
+                            text === 'Unite' || text === 'UNITE' || text === 'UNİTE' || 
+                            text === 'ünite' || text === 'unite') {
+                            console.log('TAMAMEN EŞLEŞME BULUNDU: ' + text);
+                            result.found = true;
+                            result.comboboxName = comboboxName;
+                            result.matchedItem = text;
+                            
+                            // Seçimi yap
+                            select.selectedIndex = j;
+                            select.dispatchEvent(new Event('change', { bubbles: true }));
+                            select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            
+                            // Eğer Bootstrap selectpicker varsa güncelle
+                            if (typeof $ !== 'undefined' && $('.selectpicker').length > 0) {
+                                $(select).selectpicker('refresh');
+                            }
+                            
+                            return result;
+                        }
+                        // İçeriğinde kelime olarak "ünite" geçiyorsa
+                        else if (lowercaseText.includes('ünite') || lowercaseText.includes('unite')) {
+                            // Tam kelime kontrolü
+                            if (lowercaseText === 'ünite' || lowercaseText === 'unite' || 
+                                lowercaseText.startsWith('ünite ') || lowercaseText.startsWith('unite ') ||
+                                lowercaseText.endsWith(' ünite') || lowercaseText.endsWith(' unite') ||
+                                lowercaseText.includes(' ünite ') || lowercaseText.includes(' unite ')) {
+                                
+                                console.log('KELİME OLARAK EŞLEŞME BULUNDU: ' + text);
+                                result.found = true;
+                                result.comboboxName = comboboxName;
+                                result.matchedItem = text;
+                                
+                                // Seçimi yap
+                                select.selectedIndex = j;
+                                select.dispatchEvent(new Event('change', { bubbles: true }));
+                                select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                
+                                // Eğer Bootstrap selectpicker varsa güncelle
+                                if (typeof $ !== 'undefined' && $('.selectpicker').length > 0) {
+                                    $(select).selectpicker('refresh');
+                                }
+                                
+                                return result;
+                            }
+                        }
+                    }
+                }
+                
+                // Bootstrap selects için kontrol
+                const bootstrapSelects = document.querySelectorAll('.bootstrap-select .dropdown-toggle');
+                for (let i = 0; i < bootstrapSelects.length; i++) {
+                    const dropdown = bootstrapSelects[i];
+                    const container = dropdown.closest('.bootstrap-select');
+                    if (!container || !container.offsetParent) continue;
+                    
+                    const selectElement = container.querySelector('select');
+                    if (!selectElement) continue;
+                    
+                    const options = selectElement.options;
+                    const comboboxName = selectElement.name || selectElement.id || ('bootstrap_select_' + i);
+                    
+                    // Her bir option'ı kontrol et
+                    for (let j = 0; j < options.length; j++) {
+                        const option = options[j];
+                        const text = option.text || option.innerHTML || '';
+                        const lowercaseText = text.toLowerCase();
+                        
+                        // Tamamen eşleşme durumu
+                        if (text === 'Ünite' || text === 'ÜNITE' || text === 'ÜNİTE' || 
+                            text === 'Unite' || text === 'UNITE' || text === 'UNİTE' || 
+                            text === 'ünite' || text === 'unite') {
+                            
+                            result.found = true;
+                            result.comboboxName = comboboxName;
+                            result.matchedItem = text;
+                            
+                            // Seçimi yap
+                            selectElement.selectedIndex = j;
+                            const event = new Event('change', { bubbles: true });
+                            selectElement.dispatchEvent(event);
+                            
+                            // Bootstrap selectpicker güncelle
+                            if (typeof $ !== 'undefined') {
+                                $(selectElement).selectpicker('refresh');
+                            }
+                            
+                            return result;
+                        }
+                        // İçeriğinde kelime olarak "ünite" geçiyorsa
+                        else if (lowercaseText.includes('ünite') || lowercaseText.includes('unite')) {
+                            // Tam kelime kontrolü
+                            if (lowercaseText === 'ünite' || lowercaseText === 'unite' || 
+                                lowercaseText.startsWith('ünite ') || lowercaseText.startsWith('unite ') ||
+                                lowercaseText.endsWith(' ünite') || lowercaseText.endsWith(' unite') ||
+                                lowercaseText.includes(' ünite ') || lowercaseText.includes(' unite ')) {
+                                
+                                result.found = true;
+                                result.comboboxName = comboboxName;
+                                result.matchedItem = text;
+                                
+                                // Seçimi yap
+                                selectElement.selectedIndex = j;
+                                const event = new Event('change', { bubbles: true });
+                                selectElement.dispatchEvent(event);
+                                
+                                // Bootstrap selectpicker güncelle
+                                if (typeof $ !== 'undefined') {
+                                    $(selectElement).selectpicker('refresh');
+                                }
+                                
+                                return result;
+                            }
+                        }
+                    }
+                }
+                
+                // Eğer tam eşleşme bulunamadıysa ve "united" kelimesini atlamamız gerekiyorsa
+                // Başka bir karşılaştırma stratejisi deneyelim
+                for (let i = 0; i < selects.length; i++) {
+                    const select = selects[i];
+                    if (!select.offsetParent || select.disabled) continue;
+                    
+                    const options = select.options;
+                    const comboboxName = select.name || select.id || ('combobox_' + i);
+                    
+                    for (let j = 0; j < options.length; j++) {
+                        const option = options[j];
+                        const text = option.text || option.innerHTML || '';
+                        const lowercaseText = text.toLowerCase();
+                        
+                        // Eğer "united" değilse ve "ünite" içeriyorsa seç
+                        if (lowercaseText.includes('ünite') || lowercaseText.includes('unite')) {
+                            if (!lowercaseText.includes('united')) {
+                                console.log('"united" OLMADAN EŞLEŞME BULUNDU: ' + text);
+                                result.found = true;
+                                result.comboboxName = comboboxName;
+                                result.matchedItem = text;
+                                
+                                // Seçimi yap
+                                select.selectedIndex = j;
+                                select.dispatchEvent(new Event('change', { bubbles: true }));
+                                select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                
+                                // Eğer Bootstrap selectpicker varsa güncelle
+                                if (typeof $ !== 'undefined' && $('.selectpicker').length > 0) {
+                                    $(select).selectpicker('refresh');
+                                }
+                                
+                                return result;
+                            }
+                        }
+                    }
+                }
+                
+                console.log('"Ünite" eşleşmesi bulunamadı');
+                return result;
+                
+            } catch (e) {
+                console.error('Özel Ünite arama hatası:', e);
+                return { found: false, error: e.toString() };
+            }
+        })();
+        """.trimIndent()
+
+        // Execute the search script
+        webView.evaluateJavascript(specialScript) { result ->
+            try {
+                // Process the result
+                val cleanResult = result.trim().removeSurrounding("\"").replace("\\\"", "\"").replace("\\\\", "\\")
+
+                // Parse the JSON result
+                val jsonResult = org.json.JSONObject(cleanResult)
+                val found = jsonResult.optBoolean("found", false)
+
+                if (found) {
+                    // Match found
+                    val comboboxName = jsonResult.optString("comboboxName", "")
+                    val matchedItem = jsonResult.optString("matchedItem", "")
+
+                    // Callback for match found
+                    onItemFound?.invoke(comboboxName, matchedItem)
+
+                    // Additional display enhancement
+                    enhanceComboboxDisplay()
+                } else {
+                    // No matches found
+                    onNoResults?.invoke()
+                }
+
+                // Complete the search
+                Handler(Looper.getMainLooper()).postDelayed({
+                    onSearchComplete?.invoke()
+                }, 500)
+
+            } catch (e: Exception) {
+                // Error processing results
+                android.util.Log.e("ComboboxSearch", "Error processing results: ${e.message}")
+                onNoResults?.invoke()
+            }
+        }
+    }
+
     private fun enhanceComboboxDisplay() {
         val enhanceScript = """
         (function() {
@@ -660,6 +1396,8 @@ class ComboboxSearchHelper(private val webView: WebView) {
                         }
                     }
                     
+                    // Devre dışı bırakıldı - ekranın yukarı aşağı oynamasını önlemek için
+                    /* 
                     // Find all visible selects
                     const visibleSelects = document.querySelectorAll('select:not([style*="display: none"])');
                     for (let i = 0; i < visibleSelects.length; i++) {
@@ -670,6 +1408,7 @@ class ComboboxSearchHelper(private val webView: WebView) {
                             console.error('Error enhancing select:', e);
                         }
                     }
+                    */
                 }, 300);
                 
                 return 'ENHANCE_COMPLETED';
@@ -678,24 +1417,24 @@ class ComboboxSearchHelper(private val webView: WebView) {
             }
         })();
         """.trimIndent()
-        
+
         // Execute the enhancement script
         webView.evaluateJavascript(enhanceScript) { _ -> }
     }
-    
+
     /**
      * Normalize text for case-insensitive and accent-insensitive comparison
      * Enhanced to handle all Turkish character combinations properly
-     * 
+     *
      * @param text Text to normalize
      * @return Normalized text
      */
     private fun normalizeText(text: String): String {
         if (text.isBlank()) return ""
-        
+
         // Convert to lowercase first
         var normalizedText = text.lowercase()
-        
+
         // Create a comprehensive map of Turkish characters to their Latin equivalents
         val replacements = mapOf(
             // Both uppercase and lowercase versions
@@ -707,14 +1446,52 @@ class ComboboxSearchHelper(private val webView: WebView) {
             "ö" to "o", "Ö" to "o",  // ö -> o
             "ç" to "c", "Ç" to "c"   // ç -> c
         )
-        
+
         // Apply all replacements
         for ((original, replacement) in replacements) {
             normalizedText = normalizedText.replace(original, replacement)
         }
-        
+
         // Additional Unicode normalization to handle remaining diacritical marks
         return java.text.Normalizer.normalize(normalizedText, java.text.Normalizer.Form.NFD)
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+    }
+
+    /**
+     * Debug yardımcı fonksiyonu - Uygulama logu için
+     */
+    private fun logMatching(searchText: String, items: List<String>) {
+        val normalizedSearch = normalizeText(searchText)
+        android.util.Log.d("ComboboxMatcher", "Arama: '$searchText' -> Normalized: '$normalizedSearch'")
+
+        for (item in items) {
+            val normalizedItem = normalizeText(item)
+            val exactMatch = exactWordMatch(normalizedItem, normalizedSearch)
+            android.util.Log.d("ComboboxMatcher", "Item: '$item' -> Normalized: '$normalizedItem', Exact Match: $exactMatch")
+        }
+    }
+
+    /**
+     * Bir string'in başka bir string'in başında tam kelime olarak eşleşip eşleşmediğini kontrol eder
+     */
+    private fun exactWordMatch(haystack: String, needle: String): Boolean {
+        if (haystack.isBlank() || needle.isBlank()) return false
+
+        // Eğer tam olarak aynıysa
+        if (haystack == needle) return true
+
+        // Eğer aranan kelime, hedefin başında yer alıyorsa ve sonrasında boşluk veya noktalama işareti varsa
+        if (haystack.startsWith(needle)) {
+            if (haystack.length == needle.length) {
+                return true
+            }
+
+            val nextChar = haystack[needle.length]
+            return nextChar == ' ' || nextChar == ',' || nextChar == '.' ||
+                    nextChar == ';' || nextChar == ':' || nextChar == '-' ||
+                    nextChar == '(' || nextChar == ')' || nextChar == '/'
+        }
+
+        return false
     }
 }

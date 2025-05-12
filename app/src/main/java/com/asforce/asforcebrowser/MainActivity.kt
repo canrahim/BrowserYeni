@@ -193,8 +193,66 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         // Search button'a tıklandığında
         searchButton.setOnClickListener {
             if (savedSearchTexts.isNotEmpty()) {
-                // Eğer arama metinleri varsa, direkt arama yap
-                performComboBoxSearch(savedSearchTexts)
+                // Eğer arama metinleri varsa, ComboboxSearchHelper kullan
+                val currentTab = viewModel.activeTab.value
+                val fragment = currentTab?.let { pagerAdapter.getFragmentByTabId(it.id) }
+                val webView = fragment?.getWebView()
+                
+                if (webView != null) {
+                    // Arama butonu metnini güncelle
+                    searchButton.text = "Aranıyor..."
+                    
+                    // Arama fonksiyonu
+                    var searchIndex = 0
+                    var totalMatches = 0
+                    
+                    // Arama yapma fonksiyonu
+                    fun searchNext() {
+                        if (searchIndex < savedSearchTexts.size) {
+                            val searchText = savedSearchTexts[searchIndex]
+                            searchButton.text = "Aranan: $searchText"
+                            
+                            val searchHelper = ComboboxSearchHelper(webView)
+                            searchHelper.searchComboboxes(
+                                searchText,
+                                onItemFound = { comboboxName, itemText ->
+                                    // Bir eşleşme bulunduğunda
+                                    totalMatches++
+                                    println("Combobox eşleşmesi bulundu: $comboboxName -> $itemText")
+                                },
+                                onSearchComplete = {
+                                    // Arama tamamlandığında, sonraki aramaya geç
+                                    Handler(Looper.getMainLooper()).postDelayed({
+                                        searchIndex++
+                                        searchNext()
+                                    }, 1000) // 1 saniye bekleme
+                                },
+                                onNoResults = {
+                                    // Sonuç bulunamadığında, yine sonraki aramaya geç
+                                    Handler(Looper.getMainLooper()).postDelayed({
+                                        searchIndex++
+                                        searchNext()
+                                    }, 1000) // 1 saniye bekleme
+                                }
+                            )
+                        } else {
+                            // Tüm aramalar tamamlandı
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                searchButton.text = "Ara (${savedSearchTexts.size} metin)"
+                                if (totalMatches > 0) {
+                                    // Toast.makeText(this@MainActivity, "$totalMatches eşleşme bulundu", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    // Toast.makeText(this@MainActivity, "Hiç eşleşme bulunamadı", Toast.LENGTH_SHORT).show()
+                                }
+                            }, 500)
+                        }
+                    }
+                    
+                    // İlk aramayı başlat
+                    searchNext()
+                } else {
+                    Toast.makeText(this, "Aktif sekme bulunamadı", Toast.LENGTH_SHORT).show()
+                }
             } else {
                 // Arama metinleri yoksa, önce dialog'u göster
                 searchDialog.setSearchTexts(savedSearchTexts)
@@ -1363,6 +1421,11 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                                     var option = select.options[j];
                                     var optionText = option.text;
                                     var normalizedOptionText = normalizeText(optionText);
+                                    
+                                    // United içeriyorsa atla
+                                    if (normalizedOptionText.includes('united')) {
+                                        continue;
+                                    }
                                     // Tam eşleşme önce kontrol edilir
                                     if (normalizedOptionText === normalizedSearchText) {
                                         select.selectedIndex = j;
