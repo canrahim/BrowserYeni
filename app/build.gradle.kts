@@ -109,6 +109,9 @@ dependencies {
     implementation("com.google.mlkit:object-detection:17.0.1")
     implementation("androidx.exifinterface:exifinterface:1.3.7") // Görüntü meta verisi
     
+    // Timber - Gelişmiş loglamalar için
+    implementation("com.jakewharton.timber:timber:5.0.1")
+    
     // Material Components for Modal Dialog
     implementation("com.google.android.material:material:1.11.0")
     

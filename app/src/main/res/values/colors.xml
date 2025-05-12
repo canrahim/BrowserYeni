@@ -66,4 +66,7 @@ Referans: Material Design 3 Color System, Material Theme Builder
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
     <color name="text_tertiary">#BDBDBD</color>
+    
+    <!-- Chip renkleri için -->
+    <color name="chip_background_color">#F5F5F5</color>
 </resources>

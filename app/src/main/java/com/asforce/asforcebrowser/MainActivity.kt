@@ -1067,6 +1067,9 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     /**
      * Cihaz ekleme menüsünü gösterir
      * WebView'de mevcut cihaz listesini alır ve kullanıcıya sunar
+     * 
+     * DeviceManager ile tam entegre edilmiş modern UI tasarımı ve 
+     * gelişmiş özellikler sunar.
      */
     private fun showDeviceAddMenu() {
         val currentTab = viewModel.activeTab.value
@@ -1074,16 +1077,16 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         val webView = webViewFragment?.getWebView()
 
         if (webView != null) {
-            // JavaScript ile cihaz listesini almak için DeviceManager'ı kullan
-            // DeviceManager sınıfı henüz oluşturulmadığı için basit bir implementasyon kullanabiliriz
+            // URL'yi kontrol et, eğer ekleme sayfasında değilse uyar
+            val currentUrl = currentTab.url
+            if (!currentUrl.contains("szutest.com.tr", ignoreCase = true)) {
+                Toast.makeText(this, "Cihaz eklemek için önce szutest.com.tr sayfasına gidiniz", Toast.LENGTH_SHORT).show()
+                return
+            }
             
-            // Geçici çözüm - kullanıcıya bilgi ver
-            Toast.makeText(this, "Cihaz ekleme özelliği yakında...", Toast.LENGTH_SHORT).show()
-            
-            /* Gelecekteki implementasyon:
-            val deviceManager = DeviceManager(this, webView)
+            // Cihaz listesini almak ve işlemek için DeviceManager'ı kullan
+            val deviceManager = com.asforce.asforcebrowser.devicemanager.DeviceManager(this, webView)
             deviceManager.fetchDeviceList()
-            */
         } else {
             Toast.makeText(this, "Aktif sekme bulunamadı", Toast.LENGTH_SHORT).show()
         }
