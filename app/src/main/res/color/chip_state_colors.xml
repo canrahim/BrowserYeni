@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Seçili durum - Karanlık ve açık mod için -->
+    <item android:color="?attr/colorPrimaryContainer" android:state_checked="true"/>
+    <!-- Normal durum - Karanlık ve açık mod için -->
+    <item android:color="?attr/colorSurface"/>
+</selector>

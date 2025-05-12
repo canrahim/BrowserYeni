@@ -5,29 +5,43 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
     
-    <!-- Cihaz Ana Gövdesi (Tablet/Telefon) -->
+    <!-- Daha yuvarlak kenarlar ve modern çizgilerle cihaz ana gövdesi -->
     <path
-        android:fillColor="#6366F1"
-        android:pathData="M17,2H7C5.9,2 5,2.9 5,4V20C5,21.1 5.9,22 7,22H17C18.1,22 19,21.1 19,20V4C19,2.9 18.1,2 17,2ZM17,20H7V4H17V20Z" />
+        android:fillColor="?attr/colorPrimary"
+        android:pathData="M16.5,2h-9C6.12,2 5,3.12 5,4.5v15C5,20.88 6.12,22 7.5,22h9c1.38,0 2.5,-1.12 2.5,-2.5v-15C19,3.12 17.88,2 16.5,2zM17,17.5c0,0.28 -0.22,0.5 -0.5,0.5h-9c-0.28,0 -0.5,-0.22 -0.5,-0.5v-11C7,6.22 7.22,6 7.5,6h9c0.28,0 0.5,0.22 0.5,0.5V17.5z" />
     
-    <!-- Ekle İşareti (+ işareti) -->
+    <!-- Cihaz ekranı - tema renklerine duyarlı -->
     <path
-        android:fillColor="#4CAF50"
-        android:pathData="M12,7L12,13" 
-        android:strokeWidth="2"
-        android:strokeColor="#4CAF50"
-        android:strokeLineCap="round" />
+        android:fillColor="?attr/colorSurface"
+        android:pathData="M7.5,6h9c0.28,0 0.5,0.22 0.5,0.5v11c0,0.28 -0.22,0.5 -0.5,0.5h-9c-0.28,0 -0.5,-0.22 -0.5,-0.5v-11C7,6.22 7.22,6 7.5,6z" />
     
+    <!-- Ekle işareti için modern yuvarlak arka plan -->
     <path
-        android:fillColor="#4CAF50"
-        android:pathData="M9,10L15,10" 
-        android:strokeWidth="2"
-        android:strokeColor="#4CAF50"
-        android:strokeLineCap="round" />
+        android:fillColor="?attr/colorSecondary"
+        android:pathData="M15,15m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
     
-    <!-- Ekran Parlaması (Modern dokunuş) -->
+    <!-- Artı işareti (+) - beyaz, hem açık hem koyu modda görünür -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.3"
-        android:pathData="M7,4H17V10H7V4Z" />
+        android:pathData="M15,13L15,17" 
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13,15L17,15" 
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+    
+    <!-- Modern detay: Cihaz üzerinde dokunmatik düğme -->
+    <path
+        android:fillColor="?attr/colorPrimaryVariant"
+        android:pathData="M12,19.5m-0.8,0a0.8,0.8 0,1 1,1.6 0a0.8,0.8 0,1 1,-1.6 0" />
+    
+    <!-- Modern detay: Ekranın üst kısmındaki sensör - yuvarlak -->
+    <path
+        android:fillColor="?attr/colorPrimaryVariant"
+        android:pathData="M12,4.5m-0.3,0a0.3,0.3 0,1 1,0.6 0a0.3,0.3 0,1 1,-0.6 0" />
 </vector>

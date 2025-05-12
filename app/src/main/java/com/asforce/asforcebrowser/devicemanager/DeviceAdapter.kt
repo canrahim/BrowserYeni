@@ -83,9 +83,18 @@ class DeviceAdapter(
         
         // Favori durumunu görselleştir
         holder.favoriteIcon.setImageResource(
-            if (device.isFavorite) R.drawable.ic_favorite_filled 
-            else R.drawable.ic_favorite_border
+            if (device.isFavorite) R.drawable.ic_star_filled 
+            else R.drawable.ic_star_border
         )
+        
+        // Seçim durumunu görselleştir
+        if (device.isSelected) {
+            holder.checkIconContainer.visibility = View.VISIBLE
+            holder.deviceIcon.visibility = View.INVISIBLE
+        } else {
+            holder.checkIconContainer.visibility = View.GONE
+            holder.deviceIcon.visibility = View.VISIBLE
+        }
         
         // Öğe tıklama dinleyicisi - seçim durumunu değiştirir
         holder.itemView.setOnClickListener {
@@ -172,6 +181,8 @@ class DeviceAdapter(
     inner class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val deviceName: TextView = itemView.findViewById(R.id.deviceName)
         val favoriteIcon: ImageView = itemView.findViewById(R.id.favoriteIcon)
+        val deviceIcon: ImageView = itemView.findViewById(R.id.deviceIcon)
+        val checkIconContainer: View = itemView.findViewById(R.id.checkIconContainer)
         val cardView: MaterialCardView = itemView.findViewById(R.id.deviceCardView)
     }
 }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Seçildiğinde hafif yükselme efekti -->
+    <item android:state_pressed="true">
+        <objectAnimator
+            android:propertyName="translationZ"
+            android:valueTo="4dp"
+            android:valueType="floatType"
+            android:duration="100" />
+    </item>
+    
+    <!-- Seçili durumda hafif yükselme efekti -->
+    <item android:state_selected="true">
+        <objectAnimator
+            android:propertyName="translationZ"
+            android:valueTo="2dp"
+            android:valueType="floatType"
+            android:duration="100" />
+    </item>
+    
+    <!-- Normal durumda düz -->
+    <item>
+        <objectAnimator
+            android:propertyName="translationZ"
+            android:valueTo="0dp"
+            android:valueType="floatType"
+            android:duration="100" />
+    </item>
+</selector>

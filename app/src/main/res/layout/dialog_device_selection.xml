@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorBackground">
+    android:background="?attr/colorSurface">
 
-    <!-- Üst Çubuk - Modern Tasarım -->
+    <!-- Modern Üst Çubuk - Yeni Tasarım -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/toolbarBackground"
+        android:background="?attr/colorSurface"
+        android:elevation="0dp"
+        app:elevation="0dp"
         app:layout_constraintTop_toTopOf="parent">
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -18,67 +21,89 @@
             android:layout_height="wrap_content"
             android:paddingStart="8dp"
             android:paddingEnd="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp">
+            android:paddingTop="16dp"
+            android:paddingBottom="12dp">
 
-            <!-- Kapat Butonu -->
-            <ImageView
-                android:id="@+id/btnClose"
+            <!-- Material 3 stili ile Kapat Butonu -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btnCloseCardView"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Kapat"
-                android:padding="8dp"
-                android:src="@drawable/ic_arrow_back"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="?attr/colorOutline"
+                android:layout_marginStart="8dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:tint="@color/iconTint" />
+                app:layout_constraintTop_toTopOf="parent">
 
-            <!-- Başlık -->
+                <ImageView
+                    android:id="@+id/btnClose"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Kapat"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_arrow_back"
+                    app:tint="?attr/colorOnSurface" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Modern Başlık Tasarımı -->
             <TextView
                 android:id="@+id/title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
+                android:fontFamily="sans-serif-medium"
                 android:text="Cihaz Ekle"
-                android:textColor="@color/tabTextActive"
-                android:textSize="18sp"
-                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="20sp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toEndOf="@+id/btnClose"
+                app:layout_constraintStart_toEndOf="@+id/btnCloseCardView"
                 app:layout_constraintTop_toTopOf="parent" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Arama ve Filtre Çubuğu -->
+    <!-- Yatay Ayırıcı Çizgi -->
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?attr/colorOutline"
+        android:alpha="0.12"
+        app:layout_constraintTop_toBottomOf="@+id/appbar" />
+
+    <!-- Arama ve Filtre Çubuğu - Modern Material 3 -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/filterContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingHorizontal="16dp"
-        android:paddingVertical="8dp"
-        app:layout_constraintTop_toBottomOf="@+id/appbar">
+        android:paddingVertical="16dp"
+        app:layout_constraintTop_toBottomOf="@+id/divider">
 
-        <!-- Arama Alanı -->
+        <!-- Modern Arama Alanı -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/searchLayout"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            app:boxBackgroundColor="@color/editTextBackground"
-            app:boxCornerRadiusBottomEnd="8dp"
-            app:boxCornerRadiusBottomStart="8dp"
-            app:boxCornerRadiusTopEnd="8dp"
-            app:boxCornerRadiusTopStart="8dp"
-            app:boxStrokeColor="@color/editTextStroke"
+            android:layout_marginEnd="12dp"
+            app:boxBackgroundColor="?attr/colorSurfaceVariant"
+            app:boxCornerRadiusBottomEnd="16dp"
+            app:boxCornerRadiusBottomStart="16dp"
+            app:boxCornerRadiusTopEnd="16dp"
+            app:boxCornerRadiusTopStart="16dp"
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:boxStrokeWidth="0dp"
             app:endIconDrawable="@drawable/ic_search"
             app:endIconMode="custom"
-            app:endIconTint="@color/iconTint"
+            app:endIconTint="?attr/colorOnSurfaceVariant"
             app:hintEnabled="false"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/chipGroup"
@@ -88,133 +113,179 @@
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/searchEditText"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="42dp"
                 android:background="@null"
-                android:hint="Cihaz ara"
+                android:hint="Cihaz ara..."
                 android:imeOptions="actionSearch"
                 android:inputType="text"
-                android:padding="12dp"
-                android:textColor="@color/tabTextActive"
-                android:textColorHint="@color/tabTextInactive"
+                android:paddingHorizontal="16dp"
+                android:textColor="?attr/colorOnSurface"
+                android:textColorHint="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Favori / Tümü Chip Grubu -->
+        <!-- Modern Chip Grubu -->
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/chipGroup"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:singleSelection="true">
+            app:singleSelection="true"
+            app:chipSpacingHorizontal="4dp">
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipFavorites"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
                 android:text="Favoriler"
-                android:textColor="@color/tabTextActive"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="13sp"
-                app:chipBackgroundColor="@color/chip_background_color"
-                app:chipIcon="@drawable/ic_favorite_filled"
-                app:chipIconTint="@color/buttonPrimary"
-                app:chipStrokeColor="@color/editTextStroke"
+                app:chipBackgroundColor="@color/chip_state_colors"
+                app:chipIcon="@drawable/ic_star_filled"
+                app:chipIconSize="16dp"
+                app:chipIconTint="@color/chip_icon_tint_colors"
+                app:chipStrokeColor="?attr/colorOutline"
                 app:chipStrokeWidth="1dp" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/chipAll"
-                style="@style/Widget.MaterialComponents.Chip.Choice"
+                style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Tümü"
-                android:textColor="@color/tabTextActive"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="13sp"
-                app:chipBackgroundColor="@color/chip_background_color"
-                app:chipStrokeColor="@color/editTextStroke"
+                app:chipBackgroundColor="@color/chip_state_colors"
+                app:chipStrokeColor="?attr/colorOutline"
                 app:chipStrokeWidth="1dp" />
 
         </com.google.android.material.chip.ChipGroup>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Cihaz Listesi -->
+    <!-- Sekme Altı Ayırıcı Çizgi -->
+    <View
+        android:id="@+id/divider2"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?attr/colorOutline"
+        android:alpha="0.08"
+        app:layout_constraintTop_toBottomOf="@+id/filterContainer" />
+
+    <!-- Cihaz Listesi - Modern tarz -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/deviceRecyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
-        android:paddingBottom="80dp"
+        android:paddingBottom="88dp"
+        android:paddingHorizontal="8dp"
+        android:paddingTop="8dp"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/filterContainer" />
+        app:layout_constraintTop_toBottomOf="@+id/divider2"
+        tools:listitem="@layout/item_device" />
 
-    <!-- Boş Durum Gösterimi -->
-    <LinearLayout
+    <!-- Modern Boş Durum Gösterimi -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/emptyState"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:orientation="vertical"
+        android:layout_height="0dp"
         android:padding="16dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/filterContainer">
+        app:layout_constraintTop_toBottomOf="@+id/divider2">
 
         <ImageView
-            android:layout_width="120dp"
-            android:layout_height="120dp"
+            android:id="@+id/emptyIcon"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
             android:contentDescription="Boş Liste"
             android:src="@drawable/ic_device_empty"
-            app:tint="@color/tabTextInactive" />
+            app:tint="?attr/colorPrimary"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.4" />
 
         <TextView
+            android:id="@+id/emptyTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Cihaz listesi bulunamadı"
-            android:textColor="@color/tabTextActive"
-            android:textSize="16sp" />
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="18sp"
+            android:fontFamily="sans-serif-medium"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/emptyIcon" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/emptySubtitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:layout_marginHorizontal="32dp"
             android:gravity="center"
             android:text="Cihaz listesi yüklenemedi veya boş. Lütfen sayfayı yenileyip tekrar deneyiniz."
-            android:textColor="@color/tabTextInactive"
-            android:textSize="14sp" />
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/emptyTitle" />
 
-    </LinearLayout>
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRetry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Tekrar Dene"
+            android:textColor="?attr/colorOnPrimary"
+            app:cornerRadius="20dp"
+            android:paddingHorizontal="24dp"
+            app:backgroundTint="?attr/colorPrimary"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/emptySubtitle" />
 
-    <!-- Yükleniyor Göstergesi -->
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Modern Yükleniyor Göstergesi -->
     <com.google.android.material.progressindicator.CircularProgressIndicator
         android:id="@+id/progressIndicator"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:indeterminate="true"
-        app:indicatorColor="@color/buttonPrimary"
+        app:indicatorColor="?attr/colorPrimary"
+        app:indicatorSize="48dp"
+        app:trackCornerRadius="3dp"
+        app:trackThickness="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/filterContainer"
-        app:trackColor="@color/editTextBackground" />
+        app:layout_constraintTop_toBottomOf="@+id/divider2"
+        app:trackColor="?attr/colorSurfaceVariant" />
 
-    <!-- Alt Butonlar -->
+    <!-- Alt Butonlar - Modern Tasarım -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/bottomButtonsCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardBackgroundColor="@color/toolbarBackground"
+        app:cardBackgroundColor="?attr/colorSurface"
         app:cardElevation="8dp"
+        app:strokeWidth="0.5dp"
+        app:strokeColor="?attr/colorOutline"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -222,45 +293,52 @@
             android:layout_height="wrap_content"
             android:padding="16dp">
 
-            <!-- Tümünü Seç Butonu -->
+            <!-- Tümünü Seç Butonu - Modern -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSelectAll"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
                 android:text="Tümünü Seç"
-                android:textColor="@color/buttonPrimary"
-                app:cornerRadius="8dp"
+                android:textColor="?attr/colorPrimary"
+                app:cornerRadius="24dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
-                app:strokeColor="@color/buttonPrimary" />
+                app:rippleColor="?attr/colorPrimaryContainer"
+                app:strokeColor="?attr/colorPrimary" />
 
-            <!-- İptal Butonu -->
+            <!-- İptal Butonu - Modern -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCancel"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
+                style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="12dp"
                 android:text="İptal"
-                android:textColor="@color/tabTextInactive"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                app:cornerRadius="24dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toStartOf="@+id/btnSubmit"
-                app:layout_constraintTop_toTopOf="parent" />
+                app:layout_constraintTop_toTopOf="parent"
+                app:rippleColor="?attr/colorSurfaceVariant" />
 
-            <!-- Ekle Butonu -->
+            <!-- Ekle Butonu - Modern -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSubmit"
+                style="@style/Widget.Material3.Button.ElevatedButton"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="48dp"
+                android:paddingHorizontal="24dp"
                 android:text="Ekle"
-                android:textColor="@color/buttonText"
-                app:backgroundTint="@color/buttonPrimary"
-                app:cornerRadius="8dp"
+                android:textColor="?attr/colorOnPrimary"
+                app:backgroundTint="?attr/colorPrimary"
+                app:cornerRadius="24dp"
+                app:elevation="2dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                app:layout_constraintTop_toTopOf="parent"
+                app:rippleColor="?attr/colorPrimaryContainer" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
