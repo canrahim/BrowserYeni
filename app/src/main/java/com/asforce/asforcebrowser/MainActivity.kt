@@ -51,7 +51,7 @@ import org.json.JSONArray
 import android.view.inputmethod.InputMethodManager
 
 // QR Scanner bileşenleri
-import com.asforce.asforcebrowser.qr.QRScannerDialog
+import com.asforce.asforcebrowser.qrscan.QRScannerDialog
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
@@ -1961,6 +1961,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
     
     /**
      * QR Tarama Dialog'unu göster
+     * Modernize edilmiş QR kod tarama diyaloğunu başlatır
      */
     private fun showQrScannerDialog() {
         QRScannerDialog.show(
@@ -1970,7 +1971,7 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
                 processQrCodeResult(qrContent)
             },
             onDismiss = {
-                // Dialog kapatıldığında yapılacaklar (eğer gerekiyorsa)
+                // Dialog kapatıldığında yapılacak özel işlem gerekmiyor
             }
         )
     }

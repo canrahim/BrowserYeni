@@ -3,43 +3,33 @@ package com.asforce.asforcebrowser.qr.enhancement
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.media.Image
 import android.util.Log
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import jp.co.cyberagent.android.gpuimage.GPUImage
-import jp.co.cyberagent.android.gpuimage.filter.GPUImageContrastFilter
-import jp.co.cyberagent.android.gpuimage.filter.GPUImageFilter
-import jp.co.cyberagent.android.gpuimage.filter.GPUImageBrightnessFilter
-import jp.co.cyberagent.android.gpuimage.filter.GPUImageFilterGroup
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 /**
- * Düşük ışık koşullarında QR tarama performansını artırmak için görüntü geliştirme sınıfı
+ * Düşük ışık koşullarında QR tarama performansını artırmak için basitleştirilmiş görüntü geliştirme sınıfı
  * 
- * GPU hızlandırmalı görüntü işleme, kontrast iyileştirme ve uyarlanabilir parlaklık ayarı
- * ile QR kodlarının zorlu ışık koşullarında bile yüksek hızda tespit edilmesini sağlar.
+ * Android'in kendi grafik API'lerini kullanarak kontrast iyileştirme ve uyarlanabilir parlaklık ayarı
  *
  * Referanslar:
  * - "Low Light Image Enhancement: A Survey" - Yang Yu, et al. (2021)
  * - "Efficient Contrast Enhancement for Low-Light Image Processing" - Li M., Liu J. (2022)
- * - GPU Image: https://github.com/cats-oss/android-gpuimage
  */
 class LowLightEnhancer(private val context: Context) {
 
-    // GPU işleme için kullanılacak sınıf
-    private val gpuImage = GPUImage(context)
-    
-    // Görüntü filtrelerini tutan grup
-    private val filterGroup = GPUImageFilterGroup().apply {
-        // Histogram eşitleme ve kontrast filtresi
-        addFilter(GPUImageContrastFilter(1.5f))
-        
-        // Parlaklık filtresi - başlangıçta normal
-        addFilter(GPUImageBrightnessFilter(0.1f))
+    // Renk matrisi ve filtresi
+    private val colorMatrix = ColorMatrix()
+    private val paint = Paint().apply {
+        colorFilter = ColorMatrixColorFilter(colorMatrix)
     }
     
     // Önceki ışık seviyesi değerleri
@@ -47,8 +37,6 @@ class LowLightEnhancer(private val context: Context) {
     private var consecutiveDarkFrames = 0
     
     init {
-        // Filtreleri GPU Image'a ayarla
-        gpuImage.setFilter(filterGroup)
         Log.d(TAG, "Düşük ışık görüntü geliştirici başlatıldı")
     }
     
@@ -118,29 +106,51 @@ class LowLightEnhancer(private val context: Context) {
      * @param mode Tarama modu
      */
     fun updateFiltersForMode(mode: ScanMode) {
-        val filters = (filterGroup.filters as MutableList<GPUImageFilter>)
+        // Kontrast ayarını belirle
+        val contrast = when (mode) {
+            ScanMode.EXTREME_LOW_LIGHT -> 2.0f  // Yüksek kontrast
+            ScanMode.LOW_LIGHT -> 1.8f  // Geliştirilmiş kontrast
+            ScanMode.NORMAL -> 1.4f     // Normal kontrast
+            ScanMode.BRIGHT -> 1.2f     // Düşük kontrast
+            ScanMode.AUTO -> 1.5f       // Otomatik mod - varsayılan değer
+        }
         
-        // Kontrast filtresi
-        (filters[0] as GPUImageContrastFilter).setContrast(
-            when (mode) {
-                ScanMode.EXTREME_LOW_LIGHT -> 2.0f  // Yüksek kontrast
-                ScanMode.LOW_LIGHT -> 1.8f  // Geliştirilmiş kontrast
-                ScanMode.NORMAL -> 1.4f     // Normal kontrast
-                ScanMode.BRIGHT -> 1.2f     // Düşük kontrast
-                ScanMode.AUTO -> 1.5f       // Otomatik mod - varsayılan değer
-            }
-        )
+        // Parlaklık ayarını belirle
+        val brightness = when (mode) {
+            ScanMode.EXTREME_LOW_LIGHT -> 0.25f // Yüksek parlaklık artışı
+            ScanMode.LOW_LIGHT -> 0.15f         // Orta parlaklık artışı
+            ScanMode.NORMAL -> 0.05f            // Hafif parlaklık artışı
+            ScanMode.BRIGHT -> 0.0f             // Parlaklık değiştirme
+            ScanMode.AUTO -> 0.1f               // Otomatik mod - varsayılan değer
+        }
         
-        // Parlaklık filtresi
-        (filters[1] as GPUImageBrightnessFilter).setBrightness(
-            when (mode) {
-                ScanMode.EXTREME_LOW_LIGHT -> 0.25f // Yüksek parlaklık artışı
-                ScanMode.LOW_LIGHT -> 0.15f         // Orta parlaklık artışı
-                ScanMode.NORMAL -> 0.05f            // Hafif parlaklık artışı
-                ScanMode.BRIGHT -> 0.0f             // Parlaklık değiştirme
-                ScanMode.AUTO -> 0.1f               // Otomatik mod - varsayılan değer
-            }
-        )
+        // ColorMatrix matrisi güncelle
+        colorMatrix.reset()
+        
+        // Kontrast Ayarı
+        val scale = contrast
+        val translate = (-.5f * scale + .5f) * 255f
+        colorMatrix.set(floatArrayOf(
+            scale, 0f, 0f, 0f, translate,
+            0f, scale, 0f, 0f, translate,
+            0f, 0f, scale, 0f, translate,
+            0f, 0f, 0f, 1f, 0f
+        ))
+        
+        // Parlaklık Ayarı (ikinci matris)
+        if (brightness != 0f) {
+            val brightnessMatrix = ColorMatrix()
+            brightnessMatrix.set(floatArrayOf(
+                1f, 0f, 0f, 0f, brightness * 255f,
+                0f, 1f, 0f, 0f, brightness * 255f,
+                0f, 0f, 1f, 0f, brightness * 255f,
+                0f, 0f, 0f, 1f, 0f
+            ))
+            colorMatrix.postConcat(brightnessMatrix)
+        }
+        
+        // ColorFilter güncelle
+        paint.colorFilter = ColorMatrixColorFilter(colorMatrix)
         
         Log.d(TAG, "Filtreler güncellendi: Mod = $mode")
     }
@@ -154,7 +164,18 @@ class LowLightEnhancer(private val context: Context) {
      */
     fun enhanceImage(imageBitmap: Bitmap, mode: ScanMode): Bitmap {
         updateFiltersForMode(mode)
-        return gpuImage.getBitmapWithFilterApplied(imageBitmap)
+        
+        // Yeni bitmap oluştur ve üzerine efektler uygulayarak çiz
+        val resultBitmap = Bitmap.createBitmap(
+            imageBitmap.width, 
+            imageBitmap.height, 
+            Bitmap.Config.ARGB_8888
+        )
+        
+        val canvas = Canvas(resultBitmap)
+        canvas.drawBitmap(imageBitmap, 0f, 0f, paint)
+        
+        return resultBitmap
     }
     
     /**

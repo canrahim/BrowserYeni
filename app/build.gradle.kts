@@ -93,20 +93,21 @@ dependencies {
     // Volley - HTTP istekleri için
     implementation("com.android.volley:volley:1.2.1")
     
-    // Google ML Kit - Gelişmiş QR Code scanning (En son sürüm)
+    // Google ML Kit - QR Code scanning
     implementation("com.google.mlkit:barcode-scanning:17.2.0") // Temel barkod tarama
     implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.0") // Gelişmiş özellikler
     
-    // CameraX dependencies - En son sürümler
+    // CameraX dependencies - Güncel sürümler
     implementation("androidx.camera:camera-core:1.3.2")
     implementation("androidx.camera:camera-camera2:1.3.2")
     implementation("androidx.camera:camera-lifecycle:1.3.2")
     implementation("androidx.camera:camera-view:1.3.2")
     implementation("androidx.camera:camera-extensions:1.3.2") // Düşük ışık desteği için
     
-    // Görüntü işleme ve filtreleme
+    // Google MLKit için barcode modelleri
+    implementation("com.google.mlkit:image-labeling:17.0.8")
+    implementation("com.google.mlkit:object-detection:17.0.1")
     implementation("androidx.exifinterface:exifinterface:1.3.7") // Görüntü meta verisi
-    implementation("jp.co.cyberagent.android:gpuimage:2.1.0") // GPU tabanlı görüntü işleme
     
     // Material Components for Modal Dialog
     implementation("com.google.android.material:material:1.11.0")
