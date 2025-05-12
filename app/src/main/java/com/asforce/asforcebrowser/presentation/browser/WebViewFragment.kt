@@ -20,6 +20,12 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import com.asforce.asforcebrowser.R
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import android.widget.ImageView
+import android.widget.TextView
 import com.asforce.asforcebrowser.databinding.FragmentWebViewBinding
 import com.asforce.asforcebrowser.util.configure
 import com.asforce.asforcebrowser.util.normalizeUrl
@@ -108,20 +114,20 @@ class WebViewFragment : Fragment() {
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
             super.onPageStarted(view, url, favicon)
             url?.let {
-            // URL değişimini viewModel'e bildir
-            viewModel.updateCurrentUrl(it)
+                // URL değişimini viewModel'e bildir
+                viewModel.updateCurrentUrl(it)
 
-            // Sekme verilerini güncelle
-            lifecycleScope.launch {
-            viewModel.updateTab(tabId, it, view?.title ?: "Yükleniyor...", favicon)
-            }
+                // Sekme verilerini güncelle
+                lifecycleScope.launch {
+                    viewModel.updateTab(tabId, it, view?.title ?: "Yükleniyor...", favicon)
+                }
 
-                        // MainActivity'ye URL değişikliğini bildir
+                // MainActivity'ye URL değişikliğini bildir
                 (activity as? BrowserCallback)?.onUrlChanged(it)
             }
 
-                    // BrowserActivity'ye sayfa yüklenmeye başladığını bildir
-                    (activity as? BrowserCallback)?.onPageLoadStarted()
+            // BrowserActivity'ye sayfa yüklenmeye başladığını bildir
+            (activity as? BrowserCallback)?.onPageLoadStarted()
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
@@ -200,7 +206,7 @@ class WebViewFragment : Fragment() {
                 lifecycleScope.launch {
                     viewModel.updateTab(tabId, url, title, icon)
                     
-                    // Favicon'u kaızak için ayrıca FaviconManager'a kaydet
+                    // Favicon'u kayzak için ayrıca FaviconManager'a kaydet
                     if (icon != null && url.isNotEmpty()) {
                         requireContext().let { context ->
                             // FaviconManager'a favicon'u kaydet
@@ -528,10 +534,6 @@ class WebViewFragment : Fragment() {
      * Geçici kamera fotoğraf dosyası oluşturur
      * @return Oluşturulan geçici dosyanın URI'si
      */
-    /**
-     * Geçici kamera fotoğraf dosyası oluşturur
-     * @return Oluşturulan geçici dosyanın URI'si
-     */
     private fun createTempImageFileUri(): Uri? {
         try {
             val context = requireContext()
@@ -560,44 +562,194 @@ class WebViewFragment : Fragment() {
     
     /**
      * Dosya seçim dialog'unu gösterir
-     * Kamera, galeri ve dosya seçeneklerini sunar
+     * Modern Bottom Sheet style dialog ile çeşitli dosya seçenekleri sunar
      */
     private fun showFileChooserDialog(context: Context, fileChooserParams: WebChromeClient.FileChooserParams?) {
-        val options = arrayOf("Kamera", "Galeri/Dosyalar")
+        // Bottom sheet dialog oluştur
+        val bottomSheetDialog = BottomSheetDialog(context)
+        val bottomSheetView = layoutInflater.inflate(R.layout.file_chooser_bottom_sheet, null)
+        bottomSheetDialog.setContentView(bottomSheetView)
 
-        androidx.appcompat.app.AlertDialog.Builder(context)
-            .setTitle("Görüntü veya Dosya Seç")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> { // Kamera
-                        takePictureWithCamera()
-                    }
-                    1 -> { // Galeri/Dosyalar
-                        // Kabul edilen mimetype'ları al
-                        val acceptTypes = fileChooserParams?.acceptTypes ?: arrayOf("*/*")
-                        var mimeType = "*/*"
-                        
-                        // Eğer özel mime type belirtilmişse kullan
-                        if (acceptTypes.isNotEmpty() && acceptTypes[0].isNotEmpty() && acceptTypes[0] != "*/*") {
-                            mimeType = acceptTypes[0]
-                        }
-                        
-                        // Dosya/resim seçiciyi aç
-                        getContentLauncher.launch(mimeType)
+        // RecyclerView'i ayarla
+        val recyclerView = bottomSheetView.findViewById<RecyclerView>(R.id.recyclerViewOptions)
+        recyclerView.layoutManager = LinearLayoutManager(context)
+
+        // Seçenekleri oluştur
+        val options = createFilePickerOptions(fileChooserParams)
+
+        // Adapter'i ayarla
+        val adapter = FilePickerOptionAdapter(options) { option ->
+            // Seçenek tıklandığında
+            when (option.id) {
+                1 -> { // Kamera
+                    takePictureWithCamera()
+                    bottomSheetDialog.dismiss()
+                }
+                2 -> { // Galeri - Resimler
+                    getContentLauncher.launch("image/*")
+                    bottomSheetDialog.dismiss()
+                }
+                3 -> { // Video
+                    getContentLauncher.launch("video/*")
+                    bottomSheetDialog.dismiss()
+                }
+                4 -> { // Ses
+                    getContentLauncher.launch("audio/*")
+                    bottomSheetDialog.dismiss()
+                }
+                5 -> { // Belgeler
+                    getContentLauncher.launch("application/pdf")
+                    bottomSheetDialog.dismiss()
+                }
+                6 -> { // Tüm dosyalar
+                    getContentLauncher.launch("*/*")
+                    bottomSheetDialog.dismiss()
+                }
+            }
+        }
+
+        recyclerView.adapter = adapter
+
+        // Dialog kapandığında iptal et
+        bottomSheetDialog.setOnCancelListener { 
+            filePathCallback?.onReceiveValue(null)
+            filePathCallback = null
+        }
+
+        // Dialog'u göster
+        bottomSheetDialog.show()
+    }
+
+    /**
+     * Dosya seçici için tüm seçenekleri oluşturur
+     */
+    private fun createFilePickerOptions(fileChooserParams: WebChromeClient.FileChooserParams?): List<FilePickerOption> {
+        val acceptTypes = fileChooserParams?.acceptTypes ?: arrayOf("*/*")
+        val isOnlyImage = acceptTypes.any { it.contains("image") && !it.contains("*/*") }
+        val isOnlyVideo = acceptTypes.any { it.contains("video") && !it.contains("*/*") }
+        val isOnlyAudio = acceptTypes.any { it.contains("audio") && !it.contains("*/*") }
+        val isOnlyDocument = acceptTypes.any { (it.contains("application/pdf") || it.contains("text/")) && !it.contains("*/*") }
+
+        val options = mutableListOf<FilePickerOption>()
+
+        // Her durumda kamera seçeneğini ekle
+        options.add(
+            FilePickerOption(
+                id = 1,
+                title = "Kamera",
+                description = "Fotoğraf çek",
+                iconResource = android.R.drawable.ic_menu_camera
+            )
+        )
+
+        // Eğer sadece belirli bir tür istendiyse sadece o türü ekle
+        // Aksi halde tüm türleri ekle
+        if (!isOnlyVideo && !isOnlyAudio && !isOnlyDocument) {
+            options.add(
+                FilePickerOption(
+                    id = 2,
+                    title = "Galeri",
+                    description = "Galerinizden bir resim seçin",
+                    iconResource = android.R.drawable.ic_menu_gallery
+                )
+            )
+        }
+
+        if (!isOnlyImage && !isOnlyAudio && !isOnlyDocument) {
+            options.add(
+                FilePickerOption(
+                    id = 3,
+                    title = "Video",
+                    description = "Video seçin veya yükleyin",
+                    iconResource = android.R.drawable.ic_media_play
+                )
+            )
+        }
+
+        if (!isOnlyImage && !isOnlyVideo && !isOnlyDocument) {
+            options.add(
+                FilePickerOption(
+                    id = 4,
+                    title = "Ses Dosyası",
+                    description = "Ses dosyası seçin",
+                    iconResource = android.R.drawable.ic_lock_silent_mode_off
+                )
+            )
+        }
+
+        if (!isOnlyImage && !isOnlyVideo && !isOnlyAudio) {
+            options.add(
+                FilePickerOption(
+                    id = 5,
+                    title = "Belgeler",
+                    description = "PDF ve diğer belgeler",
+                    iconResource = android.R.drawable.ic_menu_edit
+                )
+            )
+        }
+
+        // Tüm dosyalar seçeneğini her zaman ekle
+        options.add(
+            FilePickerOption(
+                id = 6,
+                title = "Tüm Dosyalar",
+                description = "Herhangi bir dosya seçin",
+                iconResource = android.R.drawable.ic_menu_save
+            )
+        )
+
+        return options
+    }
+
+    /**
+     * Dosya seçim seçeneği sınıfı
+     */
+    data class FilePickerOption(
+        val id: Int,
+        val title: String,
+        val description: String,
+        val iconResource: Int
+    )
+
+    /**
+     * Dosya seçim seçenekleri için adapter
+     */
+    inner class FilePickerOptionAdapter(
+        private val options: List<FilePickerOption>,
+        private val onOptionClick: (FilePickerOption) -> Unit
+    ) : RecyclerView.Adapter<FilePickerOptionAdapter.ViewHolder>() {
+
+        inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+            val icon: ImageView = itemView.findViewById(R.id.ivIcon)
+            val title: TextView = itemView.findViewById(R.id.tvOptionTitle)
+            val description: TextView = itemView.findViewById(R.id.tvOptionDescription)
+
+            init {
+                itemView.setOnClickListener {
+                    val position = adapterPosition
+                    if (position != RecyclerView.NO_POSITION) {
+                        onOptionClick(options[position])
                     }
                 }
             }
-            .setOnCancelListener {
-                // Kullanıcı iptal ederse callback'i null ile çağır
-                filePathCallback?.onReceiveValue(null)
-                filePathCallback = null
-            }
-            .show()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_file_picker_option, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val option = options[position]
+            holder.icon.setImageResource(option.iconResource)
+            holder.title.text = option.title
+            holder.description.text = option.description
+        }
+
+        override fun getItemCount() = options.size
     }
     
-    /**
-     * Kamera ile fotoğraf çekme işlemini başlatır
-     */
     /**
      * Kamera ile fotoğraf çekme işlemini başlatır
      * Güvenli null kontrolleri ile fotoğraf URI'si oluşturur
