@@ -7,6 +7,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.*
+import android.view.ActionMode
+import android.widget.PopupMenu
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -286,6 +291,9 @@ class WebViewFragment : Fragment() {
             setupWebView()
         }
 
+        // Uzun basma işlevi için bağlam menüsünü ayarla
+        setupLongPressContextMenu()
+
         // Ekran yönünü kontrol et ve webview'ı ona göre ayarla
         configureWebViewForScreenOrientation()
 
@@ -308,6 +316,9 @@ class WebViewFragment : Fragment() {
 
             // İndirme modülünü kur
             webViewDownloadHelper.setupWebViewDownloads(this)
+            
+            // HitTestResult için uzun basma desteğini etkinleştir
+            isLongClickable = true
 
             // Client'ları ayarla
             webViewClient = object : WebViewClient() {
@@ -481,6 +492,203 @@ class WebViewFragment : Fragment() {
         // WebView içeriğinin yüklü olup olmadığını kontrol et
         if (binding.webView.url == null && initialUrl.isNotEmpty()) {
             loadUrl(initialUrl)
+        }
+    }
+
+    /**
+     * Uzun basma işlevi için bağlam menüsü
+     * Kullanıcı bir linke uzun bastığında seçenekler sunar
+     * "Yeni sekmede aç", "Bağlantıyı kopyala" vb.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupLongPressContextMenu() {
+        // Popup konumunu ve davranışını düzenleyen field
+        val popupField = PopupMenu::class.java.getDeclaredField("mPopup")
+        popupField.isAccessible = true
+
+        // Touch konumunu izleme
+        var lastTouchX = 0f
+        var lastTouchY = 0f
+        
+        // Touch olaylarını daha hassas kontrol etmek için OnTouchListener kullan
+        binding.webView.setOnTouchListener { view, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    // Dokunma başlangıcında konumu kaydet
+                    lastTouchX = event.x
+                    lastTouchY = event.y
+                }
+            }
+            
+            false // Normal touch işlemlerinin devam etmesine izin ver
+        }
+        
+        // WebView'e özel uzun basılma olayı için
+        binding.webView.setOnLongClickListener { view ->
+            val webView = view as WebView
+            val hitTestResult = webView.hitTestResult
+            
+            // Link türünü kontrol et
+            when (hitTestResult.type) {
+                WebView.HitTestResult.SRC_ANCHOR_TYPE,
+                WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE,
+                WebView.HitTestResult.IMAGE_TYPE -> {
+                    // HitTestResult'tan link URL'sini al
+                    val url = hitTestResult.extra
+                    if (url != null) {
+                        try {
+                            // Özel konum hesaplamak için gerekli değerleri al
+                            val webViewLocation = IntArray(2)
+                            webView.getLocationOnScreen(webViewLocation)
+                            
+                            // Mutlak dokunma konumunu hesapla 
+                            val absoluteTouchX = webViewLocation[0] + lastTouchX.toInt()
+                            val absoluteTouchY = webViewLocation[1] + lastTouchY.toInt()
+                            
+                            // Geçici görünmez view oluştur tam dokunulan koordinatlarda
+                            val anchorView = View(requireContext())
+                            val containerLayout = binding.root as ViewGroup
+                            
+                            // View'i doğru pozisyonda yerleştir
+                            val layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT
+                            )
+                            anchorView.layoutParams = layoutParams
+                            containerLayout.addView(anchorView)
+                            
+                            // View'i dokunulan konuma taşı
+                            anchorView.x = lastTouchX
+                            anchorView.y = lastTouchY
+                            
+                            // Popup menüyü dokunulan noktada göster
+                            val popupMenu = PopupMenu(requireContext(), anchorView)
+                            
+                            // Menünün tam dokunulan yerin yanında açılmasını sağla
+                            val popup = popupField.get(popupMenu)
+                            popup.javaClass.getDeclaredMethod("setForceShowIcon", Boolean::class.java)
+                                .invoke(popup, true)
+                            
+                            // Menü öğelerini ekle
+                            if (hitTestResult.type == WebView.HitTestResult.SRC_ANCHOR_TYPE || 
+                                hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                                popupMenu.menu.add(0, 1, 0, "Yeni sekmede aç")
+                                popupMenu.menu.add(0, 2, 0, "Bağlantıyı kopyala")
+                                popupMenu.menu.add(0, 3, 0, "Arka planda aç")
+                            }
+                            
+                            if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE ||
+                                hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                                popupMenu.menu.add(0, 4, 0, "Görseli kaydet")
+                                popupMenu.menu.add(0, 5, 0, "Görsel URL'sini kopyala")
+                            }
+
+                            // Menü tıklama dinleyicisi
+                            popupMenu.setOnMenuItemClickListener { item ->
+                                when (item.itemId) {
+                                    1 -> { // Yeni sekmede aç
+                                        (activity as? BrowserCallback)?.onOpenInNewTab(url)
+                                        true
+                                    }
+                                    2 -> { // Bağlantıyı kopyala
+                                        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("Bağlantı", url)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(requireContext(), "Bağlantı kopyalandı", Toast.LENGTH_SHORT).show()
+                                        true
+                                    }
+                                    3 -> { // Arka planda aç
+                                        // Önce yeni sekme aç
+                                        (activity as? BrowserCallback)?.onOpenInNewTab(url)
+                                        // Mevcut sekmede kalmaya devam et
+                                        true
+                                    }
+                                    4 -> { // Görseli kaydet
+                                        webViewDownloadHelper.handleImageDownload(url, webView)
+                                        true
+                                    }
+                                    5 -> { // Görsel URL'sini kopyala
+                                        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("Görsel URL'si", url)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(requireContext(), "Görsel URL'si kopyalandı", Toast.LENGTH_SHORT).show()
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            }
+
+                            // PopupMenu kapatıldığında geçici view'i temizle
+                            popupMenu.setOnDismissListener {
+                                containerLayout.removeView(anchorView)
+                            }
+
+                            // Menüyü göster
+                            popupMenu.show()
+                            return@setOnLongClickListener true
+                        } catch (e: Exception) {
+                            // Herhangi bir hata durumunda varsayılan davranışı kullan
+                            e.printStackTrace()
+                            
+                            // Basit bir popup menü göster
+                            val popupMenu = PopupMenu(requireContext(), webView)
+                            // Menü öğelerini ekle...
+                            if (hitTestResult.type == WebView.HitTestResult.SRC_ANCHOR_TYPE || 
+                                hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                                popupMenu.menu.add(0, 1, 0, "Yeni sekmede aç")
+                                popupMenu.menu.add(0, 2, 0, "Bağlantıyı kopyala")
+                                popupMenu.menu.add(0, 3, 0, "Arka planda aç")
+                            }
+                            
+                            if (hitTestResult.type == WebView.HitTestResult.IMAGE_TYPE ||
+                                hitTestResult.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+                                popupMenu.menu.add(0, 4, 0, "Görseli kaydet")
+                                popupMenu.menu.add(0, 5, 0, "Görsel URL'sini kopyala")
+                            }
+
+                            // Menü tıklama dinleyicisi
+                            popupMenu.setOnMenuItemClickListener { item ->
+                                when (item.itemId) {
+                                    1 -> { // Yeni sekmede aç
+                                        (activity as? BrowserCallback)?.onOpenInNewTab(url)
+                                        true
+                                    }
+                                    2 -> { // Bağlantıyı kopyala
+                                        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("Bağlantı", url)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(requireContext(), "Bağlantı kopyalandı", Toast.LENGTH_SHORT).show()
+                                        true
+                                    }
+                                    3 -> { // Arka planda aç
+                                        // Önce yeni sekme aç
+                                        (activity as? BrowserCallback)?.onOpenInNewTab(url)
+                                        // Mevcut sekmede kalmaya devam et
+                                        true
+                                    }
+                                    4 -> { // Görseli kaydet
+                                        webViewDownloadHelper.handleImageDownload(url, webView)
+                                        true
+                                    }
+                                    5 -> { // Görsel URL'sini kopyala
+                                        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("Görsel URL'si", url)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(requireContext(), "Görsel URL'si kopyalandı", Toast.LENGTH_SHORT).show()
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            }
+
+                            // Menüyü göster
+                            popupMenu.show()
+                            return@setOnLongClickListener true
+                        }
+                    }
+                }
+            }
+            false
         }
     }
 
@@ -800,5 +1008,6 @@ class WebViewFragment : Fragment() {
         fun onPageLoadFinished()
         fun onProgressChanged(progress: Int)
         fun onUrlChanged(url: String)
+        fun onOpenInNewTab(url: String)
     }
 }

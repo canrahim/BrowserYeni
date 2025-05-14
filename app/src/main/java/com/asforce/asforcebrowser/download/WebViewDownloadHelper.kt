@@ -448,6 +448,32 @@ class WebViewDownloadHelper(context: Context) {
     }
 
     /**
+     * Görsel URL'sinden görsel indirme işlemini başlatır
+     * Özellikle link uzun tıklama menüsü için eklendi
+     * 
+     * @param url Görsel URL'si
+     * @param webView WebView referansı (null olabilir)
+     */
+    fun handleImageDownload(url: String, webView: WebView?) {
+        if (url.isEmpty()) return
+        
+        coroutineScope.launch {
+            try {
+                val imageDownloader = ImageDownloader(context)
+                imageDownloader.downloadImage(url, webView)
+            } catch (e: Exception) {
+                if (DEBUG) Log.e(TAG, "Görsel indirme hatası", e)
+                
+                // Hata durumunda basit indirmeye düş
+                val fileName = downloadManager.extractFilenameFromUrl(url)
+                withContext(Dispatchers.Main) {
+                    downloadManager.downloadFile(url, fileName, "image/*", "Mozilla/5.0", null)
+                }
+            }
+        }
+    }
+
+    /**
      * Clean up resources when helper is no longer needed
      */
     fun cleanup() {

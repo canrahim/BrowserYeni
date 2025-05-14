@@ -870,6 +870,27 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             qrCheckHandler?.postDelayed(qrCheckRunnable!!, 500)
         }
     }
+    
+    /**
+     * Yeni sekmede URL açma
+     * WebViewFragment.BrowserCallback arabiriminden çağrılır
+     */
+    override fun onOpenInNewTab(url: String) {
+        // Yeni sekme oluştur ve URL'yi bu sekmede aç
+        viewModel.createNewTab(url)
+        
+        // Sekmeler listesine kısa bir gecikme ile scroll yap
+        binding.tabsRecyclerView.postDelayed({
+            // En son sekmeyi görünür alana kaydır
+            val tabCount = tabAdapter.itemCount
+            if (tabCount > 0) {
+                binding.tabsRecyclerView.smoothScrollToPosition(tabCount - 1)
+            }
+        }, 500)
+        
+        // Kullanıcıya bilgi ver
+        Toast.makeText(this, "Bağlantı yeni sekmede açıldı", Toast.LENGTH_SHORT).show()
+    }
 
     /**
      * Ekran yönü değişikliğini yönetir

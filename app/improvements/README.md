@@ -1,78 +1,50 @@
-# Uzaktan QR Tarama Özelliği İyileştirmesi
+# AsforceBrowser Proje İyileştirmeleri
 
-Bu iyileştirme, AsforceBrowser uygulamasının QR tarama özelliğini geliştirerek uzaktan (mesafeli) QR kodlarını daha iyi algılayabilmesini sağlar.
+Bu dizin, AsforceBrowser projesi için analiz ve iyileştirme önerilerini içermektedir. İyileştirme çalışmaları kapsamında oluşturulan dosyalar aşağıdaki gibidir:
 
-## Geliştirilen Özellikler
+## İçerik
 
-1. **Uzak mesafelerden QR algılama**
-   - Daha yüksek çözünürlüklü görüntü işleme
-   - Gelişmiş odaklama algoritmaları
-   - Akıllı zoom kontrolü
+### 1. Proje Analizi (`proje_analizi.md`)
+- Projenin genel yapısı ve teknoloji yığını
+- Ana bileşenler ve özelliklerin listesi
+- Mevcut iyileştirme gereken alanlar
+- Öncelikli iyileştirme önerileri
 
-2. **Görüntü optimizasyonu**
-   - Düşük ışık koşullarında iyileştirilmiş performans
-   - Kontrast ve parlaklık ayarları
-   - GPU hızlandırmalı görüntü işleme
+### 2. Modül İyileştirmeleri (`modul_iyilestirmeleri.md`)
+- Kaçak Akım, Pano Fonksiyon Kontrolü, Topraklama ve Termal Kamera modülleri için iyileştirme önerileri
+- Her modül için:
+  - Mevcut durum analizi
+  - Mimari iyileştirmeler
+  - UI/UX iyileştirmeleri
+  - Fonksiyonel iyileştirmeler
+  - Veri yönetimi iyileştirmeleri
 
-3. **Akıllı tarama algoritmaları**
-   - Çoklu algılama stratejileri
-   - Farklı QR kod formatları desteği
-   - Algılama hassasiyeti iyileştirmeleri
+### 3. Performans İyileştirmeleri (`performans_iyilestirmeleri.md`)
+- WebView performans optimizasyonları (kod örnekleri içerir)
+- Bellek yönetimi iyileştirmeleri
+- Güvenlik iyileştirmeleri
+- Kullanıcı deneyimi iyileştirmeleri
+- Uygulama açılış ve sekme yükleme performans iyileştirmeleri
 
-## Entegrasyon Adımları
+### 4. Geliştirici Kılavuzu (`gelistirici_kilavuzu.md`)
+- Proje hakkında genel bilgi
+- Kodlama standartları
+- İş akışı kuralları
+- Bildirim ve raporlama prosedürleri
+- Özel modüller için geliştirme talimatları
 
-MainActivity sınıfına aşağıdaki şekilde entegre edilebilir:
+## Nasıl Kullanılır
 
-```kotlin
-// MainActivity.kt dosyasında yapılacak değişiklikler
+1. Proje analizini okuyarak genel bakış kazanın
+2. Geliştirici kılavuzunu inceleyin ve belirlenen standartları benimseyin
+3. Performans iyileştirme önerilerini öncelik sırasına göre uygulayın
+4. Özel modülleri geliştirirken modül iyileştirme önerilerini takip edin
 
-// 1. İçe aktarımları ekleyin
-import com.asforce.asforcebrowser.qr.ImprovedQRScannerDialog
-import com.asforce.asforcebrowser.qr.QRIntegration
+## Öncelikli Konular
 
-// 2. QR tarama metodunu değiştirin
-private fun showQRScanner() {
-    // Eski metodu değiştirin:
-    // QRScannerDialog.show(this) { qrContent -> handleQRResult(qrContent) }
-    
-    // Yeni geliştirilmiş metodu kullanın:
-    QRIntegration.startImprovedQRScanner(this) { qrContent -> 
-        handleQRResult(qrContent) 
-    }
-}
+1. WebView bellek yönetimi optimizasyonu
+2. MVVM mimarisi uygulanması ve kod organizasyonu
+3. Özel modüllerin güncel Android geliştirme pratiklerine uyarlanması
+4. Kullanıcı deneyimi iyileştirmeleri
 
-// 3. İzin sonucu kontrolünü ekleyin
-override fun onRequestPermissionsResult(
-    requestCode: Int,
-    permissions: Array<out String>,
-    grantResults: IntArray
-) {
-    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    
-    // QR tarama izni sonucunu kontrol et
-    QRIntegration.checkPermissionResult(
-        requestCode, 
-        permissions, 
-        grantResults,
-        this,
-        { showQRScanner() } // İzin verilirse QR taramayı başlat
-    )
-}
-```
-
-## Kullanım Şekli
-
-Mevcut QR tarama fonksiyonu yerine geliştirilmiş uzaktan QR tarama özelliğini kullanmak için yukarıdaki entegrasyonu yapmanız yeterlidir. Kullanıcı arayüzünde herhangi bir değişiklik gerekmemektedir, mevcut QR tarama butonu bu yeni özelliği çağıracaktır.
-
-## Test Önerileri
-
-- Uzak mesafelerdeki (1-3 metre) QR kodları test edin
-- Farklı ışık koşullarında performansı değerlendirin
-- Çeşitli boyutlardaki QR kodlarıyla deneyler yapın
-- Farklı açılardan tarama yaparak algılama kapasitesini değerlendirin
-
-## Ek Notlar
-
-- Bu iyileştirme, mevcut QR tarama fonksiyonu yerine geçerek daha kapsamlı bir çözüm sunar
-- Daha karmaşık algoritmaları kullandığı için, eski cihazlarda daha fazla işlemci gücü gerektirebilir
-- Kamera donanımına bağlı olarak, bazı cihazlarda performans farklılıkları görülebilir
+Bu iyileştirme önerileri, mevcut proje temeline dayanmaktadır ve profesyonel yazılım geliştirme pratiklerini takip etmektedir.
