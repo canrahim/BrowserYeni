@@ -5,6 +5,7 @@
     <color name="suggestion_panel_title_color">#616161</color>
     <color name="suggestion_panel_icon_color">#757575</color>
     <color name="suggestion_panel_empty_text_color">#9E9E9E</color>
+    <color name="suggestion_panel_divider_color">#E0E0E0</color>
     
     <!-- Öneri Öğesi Renkleri -->
     <color name="suggestion_item_background">#EEEEEE</color>

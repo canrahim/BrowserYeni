@@ -29,6 +29,10 @@ object KeyboardUtils {
     // Global düzen değişikliği dinleyicisi
     private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     
+    // İki klavye algılama arasındaki geçen süre kontrolü
+    private var lastKeyboardDetectionTime = 0L
+    private const val KEYBOARD_DETECTION_THROTTLE_MS = 100
+    
     /**
      * Klavye dinleyicisini ayarlar ve klavye durumundaki değişiklikleri bildirir
      * 
@@ -49,6 +53,13 @@ object KeyboardUtils {
         // GlobalLayoutListener kur
         globalLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
             try {
+                val currentTime = System.currentTimeMillis()
+                // Çok sık algılama yaparak performans sorunu yaratmayı önle
+                if (currentTime - lastKeyboardDetectionTime < KEYBOARD_DETECTION_THROTTLE_MS) {
+                    return@OnGlobalLayoutListener
+                }
+                lastKeyboardDetectionTime = currentTime
+                
                 // Görünür ekran alanını al
                 val r = Rect()
                 rootView.getWindowVisibleDisplayFrame(r)
@@ -59,8 +70,9 @@ object KeyboardUtils {
                 // Klavye yüksekliği (px olarak)
                 val keyboardHeight = screenHeight - r.bottom
                 
-                // Klavye görünür mü kontrol et (yüksekliği ekranın %15'inden büyükse)
-                val keyboardVisibilityThreshold = screenHeight * 0.15
+                // Klavye görünür mü kontrol et (yüksekliği ekranın %10'undan büyükse)
+                // Daha düşük bir eşik değeri kullanarak daha hızlı algılama
+                val keyboardVisibilityThreshold = screenHeight * 0.10
                 val isKeyboardNowVisible = keyboardHeight > keyboardVisibilityThreshold
                 
                 // Durum değiştiyse bildir
@@ -78,7 +90,8 @@ object KeyboardUtils {
                     Timber.d("Klavye durumu değişti: $isKeyboardVisible, yükseklik: $keyboardHeight")
                 } 
                 // Klavye hala görünür ama yüksekliği değiştiyse
-                else if (isKeyboardVisible && Math.abs(keyboardHeight - lastKeyboardHeight) > 100) {
+                // Daha küçük değişimlere duyarlı olalım (50px)
+                else if (isKeyboardVisible && Math.abs(keyboardHeight - lastKeyboardHeight) > 50) {
                     lastKeyboardHeight = keyboardHeight
                     notifyKeyboardHeightChanged(keyboardHeight)
                     
@@ -138,6 +151,17 @@ object KeyboardUtils {
      */
     fun getKeyboardHeight(): Int {
         return lastKeyboardHeight
+    }
+    
+    /**
+     * Öneri paneli için doğru marjin değerini hesapla
+     * Özellikle klavye ile panel arasında boşluk olmamasını sağlar
+     *
+     * @return Öneri paneli için kullanılacak alt marjin değeri
+     */
+    fun getSuggestionPanelMargin(): Int {
+        // Klavye yüksekliği 0 ise varsayılan değer döndür
+        return if (lastKeyboardHeight <= 0) 0 else lastKeyboardHeight
     }
     
     /**

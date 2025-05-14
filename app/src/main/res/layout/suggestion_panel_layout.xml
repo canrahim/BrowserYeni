@@ -8,7 +8,19 @@
     android:background="@drawable/suggestion_panel_background"
     android:elevation="8dp"
     android:paddingTop="4dp"
-    android:paddingBottom="4dp">
+    android:paddingBottom="4dp"
+    android:layout_gravity="bottom"
+    android:clipToPadding="false">
+
+    <!-- Panel Divider - Keyboard and Panel separator -->
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/suggestion_panel_divider_color"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
     <!-- Başlık ve Kapat Butonu Satırı -->
     <TextView
@@ -16,12 +28,13 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
+        android:layout_marginTop="4dp"
         android:text="Öneriler"
         android:textSize="12sp"
         android:textColor="@color/suggestion_panel_title_color"
         android:fontFamily="sans-serif-medium"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/divider" />
 
     <ImageButton
         android:id="@+id/btnCancelPanel"
@@ -32,7 +45,7 @@
         android:padding="6dp"
         android:src="@drawable/ic_close"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/divider"
         app:tint="@color/suggestion_panel_icon_color" />
 
     <!-- Öneri Listesi -->
@@ -46,6 +59,9 @@
         android:paddingEnd="8dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
+        android:fadeScrollbars="false"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbars="horizontal"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

@@ -269,23 +269,25 @@ class SuggestionManager(
     }
     
     /**
-     * Belirli bir alan için öneri panelini göster
+     * SuggestionPanel için bir alan için önerileri göster
      * 
      * @param fieldIdentifier Alan tanımlayıcısı
      */
     private fun showSuggestionPanelForField(fieldIdentifier: String) {
-        // İlk önce mevcut job'ı iptal et
-        currentSuggestionsJob?.cancel()
-        
-        // Önerileri getir ve paneli göster
-        currentSuggestionsJob = activity.lifecycleScope.launch {
-            val suggestions = viewModel.getSuggestionsForField(fieldIdentifier)
+        try {
+            // ViewModel'den öneriler için akışı al
+            currentSuggestionsJob?.cancel() // Mevcut flow varsa iptal et
             
-            // Öneri panelini göster
-            suggestionPanel.showPanel(fieldIdentifier, suggestions)
-            
-            // Panel durumunu güncelle
-            viewModel.setPanelShowing(true)
+            // Yeni flow oluştur
+            currentSuggestionsJob = activity.lifecycleScope.launch {
+                val suggestions = viewModel.getSuggestionsForField(fieldIdentifier)
+                // UI thread'inde panel güncelleme
+                activity.runOnUiThread {
+                    suggestionPanel.showPanel(fieldIdentifier, suggestions)
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Öneri panel gösterme hatası")
         }
     }
     
@@ -333,40 +335,49 @@ class SuggestionManager(
     }
     
     /**
-     * Klavye görünürlüğü değiştiğinde
+     * Klavye görünürlüğü değiştiğinde çağrılır
      * 
      * @param isVisible Klavye görünür mü
-     * @param keyboardHeight Klavye yüksekliği
+     * @param keyboardHeight Klavye yüksekliği (piksel)
      */
     override fun onKeyboardVisibilityChanged(isVisible: Boolean, keyboardHeight: Int) {
-        keyboardVisible = isVisible
-        
-        if (isVisible) {
-            // Klavye açıldığında, odaklı alan varsa öneri panelini göster
-            viewModel.currentField.value?.let { fieldId ->
-                showSuggestionPanelForField(fieldId)
+        try {
+            keyboardVisible = isVisible
+            
+            // UI işlemlerini ana thread'de yap
+            activity.runOnUiThread {
+                if (isVisible) {
+                    // Klavye göründüğünde ve aktif bir alan varsa önerileri göster
+                    val currentField = viewModel.currentField.value
+                    if (currentField != null && currentField.isNotEmpty()) {
+                        showSuggestionPanelForField(currentField)
+                    }
+                } else {
+                    // Klavye gizlendiğinde paneli de gizle
+                    suggestionPanel.hidePanel()
+                }
             }
-        } else {
-            // Klavye kapandığında paneli gizle
-            if (suggestionPanel.isVisible()) {
-                suggestionPanel.hidePanel()
-                viewModel.setPanelShowing(false)
-            }
+        } catch (e: Exception) {
+            Timber.e(e, "Klavye görünürlük değişikliği işleme hatası")
         }
-        
-        // Panele klavye durumunu bildir
-        suggestionPanel.onKeyboardVisibilityChanged(isVisible)
     }
     
     /**
-     * Klavye yüksekliği değiştiğinde
+     * Klavye yüksekliği değiştiğinde çağrılır
      * 
      * @param keyboardHeight Yeni klavye yüksekliği
      */
     override fun onKeyboardHeightChanged(keyboardHeight: Int) {
-        // Panel görünürse pozisyonunu güncelle
-        if (suggestionPanel.isVisible()) {
-            suggestionPanel.onKeyboardVisibilityChanged(true)
+        try {
+            // UI işlemlerini ana thread'de yap
+            activity.runOnUiThread {
+                // Paneli yeni klavye yüksekliğine göre güncelle
+                if (keyboardVisible) {
+                    suggestionPanel.updateKeyboardHeight(keyboardHeight)
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Klavye yükseklik değişikliği işleme hatası")
         }
     }
 }

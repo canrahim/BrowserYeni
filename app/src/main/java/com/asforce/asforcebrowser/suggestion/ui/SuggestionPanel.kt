@@ -1,6 +1,8 @@
 package com.asforce.asforcebrowser.suggestion.ui
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -43,6 +45,9 @@ class SuggestionPanel(
     
     // Mevcut alan tanımlayıcısı
     private var currentFieldIdentifier: String? = null
+    
+    // UI güncellemeleri için handler
+    private val uiHandler = Handler(Looper.getMainLooper())
     
     init {
         // Panel view'ını oluştur
@@ -148,10 +153,7 @@ class SuggestionPanel(
         
         // Paneli rootView'a ekle (henüz eklenmemişse)
         if (panelView?.parent == null) {
-            // Paneli ekle
-            (panelView?.layoutParams as? ViewGroup.MarginLayoutParams)?.apply {
-                bottomMargin = KeyboardUtils.getKeyboardHeight()
-            }
+            updatePanelPosition()
             
             rootView.addView(panelView)
             
@@ -164,6 +166,48 @@ class SuggestionPanel(
         isVisible = true
         
         Timber.d("Panel gösterildi, öneri sayısı: ${suggestions.size}")
+    }
+    
+    /**
+     * Panel pozisyonunu klavyeye göre günceller
+     */
+    private fun updatePanelPosition() {
+        panelView?.let { view ->
+            val params = view.layoutParams as? ViewGroup.MarginLayoutParams
+            params?.let {
+                // Doğru klavye marjinini al
+                val keyboardMargin = KeyboardUtils.getSuggestionPanelMargin()
+                if (it.bottomMargin != keyboardMargin) {
+                    it.bottomMargin = keyboardMargin
+                    uiHandler.post {
+                        view.layoutParams = it
+                    }
+                    Timber.d("Panel pozisyonu güncellendi, marjin: $keyboardMargin")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Klavye yüksekliği değiştiğinde panelin pozisyonunu günceller
+     * 
+     * @param keyboardHeight Yeni klavye yüksekliği
+     */
+    fun updateKeyboardHeight(keyboardHeight: Int) {
+        if (isVisible && panelView?.parent != null) {
+            panelView?.let { view ->
+                val params = view.layoutParams as? ViewGroup.MarginLayoutParams
+                params?.let {
+                    if (it.bottomMargin != keyboardHeight && keyboardHeight > 0) {
+                        it.bottomMargin = keyboardHeight
+                        uiHandler.post {
+                            view.layoutParams = it
+                        }
+                        Timber.d("Klavye yüksekliği değişikliği sonrası panel pozisyonu güncellendi: $keyboardHeight")
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -249,35 +293,7 @@ class SuggestionPanel(
      * @param suggestion Silinecek öneri
      */
     private fun onSuggestionDeleted(suggestion: SuggestionEntity) {
+        // Silme callback'ini çağır
         onSuggestionDeleted?.invoke(suggestion)
-    }
-    
-    /**
-     * Klavye görünürlüğü değiştiğinde çağrılır
-     * 
-     * @param isKeyboardVisible Klavye görünür mü
-     */
-    fun onKeyboardVisibilityChanged(isKeyboardVisible: Boolean) {
-        if (isKeyboardVisible) {
-            // Klavye görünürse panel pozisyonunu güncelle
-            (panelView?.layoutParams as? ViewGroup.MarginLayoutParams)?.apply {
-                bottomMargin = KeyboardUtils.getKeyboardHeight()
-                panelView?.requestLayout()
-            }
-        } else {
-            // Klavye görünmüyorsa paneli gizle
-            if (isVisible) {
-                hidePanel()
-            }
-        }
-    }
-    
-    /**
-     * Panel görünür mü?
-     * 
-     * @return Panel görünürlük durumu
-     */
-    fun isVisible(): Boolean {
-        return isVisible
     }
 }
