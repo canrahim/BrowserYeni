@@ -160,13 +160,8 @@ class SuggestionPanel(
     fun showPanel(fieldIdentifier: String, suggestions: List<SuggestionEntity>) {
         currentFieldIdentifier = fieldIdentifier
         
-        // Alan başlığını güncelle
-        val displayName = if (fieldIdentifier.length > 20) {
-            fieldIdentifier.substring(0, 17) + "..."
-        } else {
-            fieldIdentifier
-        }
-        panelTitle?.text = "Öneriler: $displayName"
+        // Alan başlığını gizle
+        panelTitle?.visibility = View.GONE
         
         // Panel zaten görünür mü kontrol et
         if (isVisible) {
