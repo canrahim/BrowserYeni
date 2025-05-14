@@ -1,6 +1,7 @@
 package com.asforce.asforcebrowser.suggestion.ui
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
@@ -29,6 +30,9 @@ class SuggestionPanel(
 ) {
     // Panel view'ı
     private var panelView: View? = null
+    
+    // Arka plan overlay (dışarı tıklamayı algılamak için)
+    private var overlayView: View? = null
     
     // Adapter ve RecyclerView
     private var suggestionAdapter: SuggestionAdapter? = null
@@ -112,6 +116,40 @@ class SuggestionPanel(
         val inflater = LayoutInflater.from(context)
         panelView = inflater.inflate(R.layout.suggestion_panel_layout, rootView, false)
         
+        // Overlay view (dışarı tıklamayı yakalamak için)
+        overlayView = View(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            
+            // Overlay'ı tamamen şeffaf yap
+            setBackgroundColor(Color.TRANSPARENT)
+            
+            // Tıklanmayı yakalamak için
+            setOnClickListener {
+                Timber.d("Öneri paneli dışına tıklandı, panel ve klavye kapatılıyor")
+                
+                // Hem paneli hem de klavyeyi kapat
+                hidePanel(true)
+                
+                // Aktif inputu bul ve odağını kaldır
+                val currentFocus = (activity as? FragmentActivity)?.currentFocus
+                if (currentFocus != null) {
+                    // Aktif alan varsa klavyeyi gizle
+                    KeyboardUtils.hideKeyboard(context, currentFocus)
+                } else {
+                    // Aktif alan bulunamadıysa, rootView üzerinden klavyeyi gizlemeyi dene
+                    try {
+                        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                        imm.hideSoftInputFromWindow(rootView.windowToken, 0)
+                    } catch (e: Exception) {
+                        Timber.e("Klavye gizleme hatası: ${e.message}")
+                    }
+                }
+            }
+        }
+        
         // View elemanlarını bul
         recyclerView = panelView?.findViewById(R.id.suggestionRecyclerView)
         panelTitle = panelView?.findViewById(R.id.tvPanelTitle)
@@ -171,7 +209,12 @@ class SuggestionPanel(
         // Önce mevcut liste öğelerini güncelle
         updateSuggestions(suggestions)
         
-        // Paneli rootView'a ekle (henüz eklenmemişse)
+        // Önce overlay'ı ekle (tam ekrana dışarı tıklamalar için)
+        if (overlayView?.parent == null) {
+            rootView.addView(overlayView)
+        }
+        
+        // Sonra paneli rootView'a ekle (henüz eklenmemişse)
         if (panelView?.parent == null) {
             updatePanelPosition()
             
@@ -245,36 +288,98 @@ class SuggestionPanel(
      * @param forceHide Animasyon olmadan zorla gizle
      */
     fun hidePanel(forceHide: Boolean = false) {
-        if (!isVisible || panelView == null) {
+        // İşlem öncesi erken çıkış kontrolü
+        if (!isVisible) {
+            Timber.d("Panel zaten görünmüyor, gizleme işlemi atlanıyor")
             return
         }
         
-        if (forceHide) {
-            // Animasyon olmadan hemen kaldır
-            rootView.removeView(panelView)
+        if (panelView == null) {
+            Timber.d("Panel view null, gizleme işlemi atlanıyor")
             isVisible = false
-            Timber.d("Panel zorla gizlendi")
             return
         }
         
-        // Normal animasyonlu kapatma
-        val slideDown = AnimationUtils.loadAnimation(context, R.anim.slide_down)
-        
-        slideDown.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
-            override fun onAnimationStart(animation: android.view.animation.Animation?) {}
-            
-            override fun onAnimationEnd(animation: android.view.animation.Animation?) {
-                // Animasyon tamamlandığında paneli kaldır
-                rootView.removeView(panelView)
-                isVisible = false
+        try {
+            // Her durumda overlay'ı hemen kaldır
+            if (overlayView?.parent != null) {
+                rootView.removeView(overlayView)
             }
             
-            override fun onAnimationRepeat(animation: android.view.animation.Animation?) {}
-        })
-        
-        panelView?.startAnimation(slideDown)
-        
-        Timber.d("Panel animasyon ile gizlendi")
+            if (forceHide) {
+                // Animasyon olmadan hemen kaldır
+                if (panelView?.parent != null) {
+                    rootView.removeView(panelView)
+                }
+                isVisible = false
+                Timber.d("Panel zorla gizlendi")
+                
+                // Gecikmeli olarak bir kez daha kontrol et (bazı cihazlarda parent'tan ayrılmayabilir)
+                uiHandler.postDelayed({
+                    if (panelView?.parent != null) {
+                        try {
+                            (panelView?.parent as? ViewGroup)?.removeView(panelView)
+                            Timber.d("Panel ikincil kontrol ile kaldırıldı")
+                        } catch (e: Exception) {
+                            Timber.e("Panel ikincil kaldırma hatası: ${e.message}")
+                        }
+                    }
+                }, 100)
+                
+                return
+            }
+            
+            // Normal animasyonlu kapatma
+            val slideDown = AnimationUtils.loadAnimation(context, R.anim.slide_down)
+            
+            slideDown.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
+                override fun onAnimationStart(animation: android.view.animation.Animation?) {}
+                
+                override fun onAnimationEnd(animation: android.view.animation.Animation?) {
+                    // Animasyon tamamlandığında paneli kaldır
+                    try {
+                        // Panel View'ı kaldır
+                        if (panelView?.parent != null) {
+                            rootView.removeView(panelView)
+                        }
+                        
+                        // Overlay'ı kaldır (eğer hala duruyorsa)
+                        if (overlayView?.parent != null) {
+                            rootView.removeView(overlayView)
+                        }
+                        
+                        isVisible = false
+                    } catch (e: Exception) {
+                        Timber.e("Panel animasyon sonrası kaldırma hatası: ${e.message}")
+                        // Hata durumunda yine de gizli olarak işaretle
+                        isVisible = false
+                    }
+                }
+                
+                override fun onAnimationRepeat(animation: android.view.animation.Animation?) {}
+            })
+            
+            panelView?.startAnimation(slideDown)
+            
+            Timber.d("Panel animasyon ile gizlendi")
+        } catch (e: Exception) {
+            Timber.e("Panel gizleme genel hatası: ${e.message}")
+            // Hata durumunda yine de gizli olarak işaretle ve view'ı kaldırmaya çalış
+            isVisible = false
+            try {
+                // Paneli kaldır
+                if (panelView?.parent != null) {
+                    rootView.removeView(panelView)
+                }
+                
+                // Overlay'ı kaldır
+                if (overlayView?.parent != null) {
+                    rootView.removeView(overlayView)
+                }
+            } catch (e2: Exception) {
+                Timber.e("Panel hata sonrası kaldırma girişimi başarısız: ${e2.message}")
+            }
+        }
     }
     
     /**

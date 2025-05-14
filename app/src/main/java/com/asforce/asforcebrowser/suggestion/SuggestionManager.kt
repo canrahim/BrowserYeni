@@ -1,6 +1,7 @@
 package com.asforce.asforcebrowser.suggestion
 
 import android.content.Context
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.fragment.app.FragmentActivity
@@ -415,11 +416,26 @@ class SuggestionManager(
                     // Klavye gizlendiğinde her zaman paneli gizle
                     if (suggestionPanel.isVisible()) {
                         Timber.d("Klavye kapandı, panel kapatılıyor")
-                        suggestionPanel.hidePanel(true) // Zorla kapat parametresi eklenecek
+                        suggestionPanel.hidePanel(true) // Zorla kapat parametresi
                         
                         // Panel kapatma durumunu ViewModel'e bildir
                         viewModel.setPanelShowing(false)
                     }
+                    
+                    // Klavye kapandığında, mevcut odaklanmış alan değerini temizle
+                    // Bu sayede bir alandan çıkıp panel açık kalırsa kapatılacak
+                    if (viewModel.currentField.value != null) {
+                        viewModel.setCurrentField(null)
+                    }
+                    
+                    // Emin olmak için gecikmeli bir kapatma daha ekleyelim
+                    activity.findViewById<View>(android.R.id.content).postDelayed({
+                        if (!keyboardVisible && suggestionPanel.isVisible()) {
+                            Timber.d("Klavye kapanma kontrolü gecikmeli tetiklendi, panel kapatılıyor")
+                            suggestionPanel.hidePanel(true)
+                            viewModel.setPanelShowing(false)
+                        }
+                    }, 300)
                 }
             }
         } catch (e: Exception) {

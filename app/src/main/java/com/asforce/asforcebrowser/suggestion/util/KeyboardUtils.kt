@@ -83,6 +83,21 @@ object KeyboardUtils {
                     if (!isKeyboardVisible) {
                         Timber.d("Klavye kapandı olarak tespit edildi")
                         notifyKeyboardVisibilityChanged(false, 0)
+                        
+                        // Klavye kapandığında gecikmeli olarak bir kez daha kontrol et
+                        // Kimi cihazlarda kapanma olayı doğru algılanmayabilir
+                        rootView.postDelayed({
+                            val r2 = Rect()
+                            rootView.getWindowVisibleDisplayFrame(r2)
+                            val currentKeyboardHeight = screenHeight - r2.bottom
+                            
+                            // Eğer hala kapandığını düşünüyorsak tekrar bildir
+                            if (currentKeyboardHeight < keyboardVisibilityThreshold && isKeyboardVisible) {
+                                Timber.d("Klavye kapanma olayı tekrar kontrol edildi ve bildirildi")
+                                isKeyboardVisible = false
+                                notifyKeyboardVisibilityChanged(false, 0)
+                            }
+                        }, 200) // Kısa bir gecikme
                     } else {
                         // Durum değişikliğini bildir
                         notifyKeyboardVisibilityChanged(isKeyboardVisible, keyboardHeight)
@@ -102,6 +117,13 @@ object KeyboardUtils {
                     notifyKeyboardHeightChanged(keyboardHeight)
                     
                     Timber.d("Klavye yüksekliği değişti: $keyboardHeight")
+                    
+                    // Eğer klavye çok küçük hale geldiyse, kapanmış olabilir
+                    if (keyboardHeight < keyboardVisibilityThreshold && isKeyboardVisible) {
+                        isKeyboardVisible = false
+                        Timber.d("Klavye kapanma durumu (yükseklik değişiminden tespit edildi)")
+                        notifyKeyboardVisibilityChanged(false, 0)
+                    }
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Klavye durumu izlenirken hata")
