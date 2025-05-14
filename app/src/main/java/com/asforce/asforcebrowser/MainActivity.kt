@@ -49,6 +49,7 @@ import com.google.android.material.textfield.TextInputEditText
 import org.json.JSONObject
 import org.json.JSONArray
 import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 
 // QR Scanner bileşenleri
 import com.asforce.asforcebrowser.qrscan.QRScannerDialog
@@ -306,6 +307,29 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
         serialTextInputLayout?.setEndIconOnClickListener {
             hideKeyboard()
             performSerialNumberSearch()
+        }
+        
+        // EditText'lere odaklandığında diğer alanların tıklanabilirliğini koru
+        qrSearchInput.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                // EditText odaklandığında, diğer alanların tıklanabilirliğini koru
+                // Gerekli birşey yapmaya gerek yok, TouchListener ile otomatik kapanacak
+            }
+        }
+        
+        serialSearchInput.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                // EditText odaklandığında, diğer alanların tıklanabilirliğini koru
+                // Gerekli birşey yapmaya gerek yok, TouchListener ile otomatik kapanacak
+            }
+        }
+        
+        // Adres çubuğu için de aynı focus listener'ı ekle
+        binding.addressBar.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                // EditText odaklandığında, diğer alanların tıklanabilirliğini koru
+                // Gerekli birşey yapmaya gerek yok, TouchListener ile otomatik kapanacak
+            }
         }
     }
     
@@ -1602,6 +1626,47 @@ class MainActivity : AppCompatActivity(), WebViewFragment.BrowserCallback {
             inputMethodManager.hideSoftInputFromWindow(view.windowToken, 0)
             view.clearFocus()
         }
+    }
+    
+    /**
+     * Tüm dokunma olaylarını yakalayan override edilmiş dispatch metodu.
+     * EditText dışına dokunulduğunda klavyeyi otomatik olarak gizler.
+     * 
+     * Referans: Android Framework - Activity.dispatchTouchEvent
+     * https://developer.android.com/reference/android/app/Activity#dispatchTouchEvent(android.view.MotionEvent)
+     */
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        // Sadece "ekrana dokunma" olayı için işlem yap
+        if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+            // Mevcut odağı al
+            val currentFocusView = currentFocus
+            
+            // Odaktaki görünüm EditText türünde mi kontrol et
+            if (currentFocusView is EditText || 
+                currentFocusView is com.google.android.material.textfield.TextInputEditText) {
+                
+                // Dokunulan koordinatlar
+                val x = event.x.toInt()
+                val y = event.y.toInt()
+                
+                // Mevcut odağın konum ve boyutlarını al
+                val outRect = android.graphics.Rect()
+                currentFocusView?.getGlobalVisibleRect(outRect)
+                
+                // Dokunuş EditText dışında ise, klavyeyi gizle
+                if (!outRect.contains(x, y)) {
+                    // Klavyeyi gizle
+                    val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                    imm.hideSoftInputFromWindow(currentFocusView.windowToken, 0)
+                    
+                    // Odağı kaldır
+                    currentFocusView.clearFocus()
+                }
+            }
+        }
+        
+        // Olayları normal işleme mekanizmasına ilet
+        return super.dispatchTouchEvent(event)
     }
     
     /**
