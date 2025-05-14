@@ -64,6 +64,9 @@ class SuggestionPanel(
         // Öneri silindiğinde çağrılacak callback
         private var onSuggestionDeleted: ((SuggestionEntity) -> Unit)? = null
         
+        // Tüm öneriler silindiğinde çağrılacak callback
+        private var onDeleteAllSuggestions: ((String) -> Unit)? = null
+        
         /**
          * JavaScript çalıştırma fonksiyonunu ayarlar
          * 
@@ -90,6 +93,15 @@ class SuggestionPanel(
         fun setSuggestionDeletedCallback(callback: (SuggestionEntity) -> Unit) {
             onSuggestionDeleted = callback
         }
+        
+        /**
+         * Tüm öneriler silindiğinde çağrılacak callback'i ayarlar
+         * 
+         * @param callback Callback fonksiyonu
+         */
+        fun setDeleteAllSuggestionsCallback(callback: (String) -> Unit) {
+            onDeleteAllSuggestions = callback
+        }
     }
     
     /**
@@ -112,7 +124,22 @@ class SuggestionPanel(
         suggestionAdapter = SuggestionAdapter(
             context = context,
             onSuggestionClick = { suggestion -> onSuggestionClicked(suggestion) },
-            onSuggestionDelete = { suggestion -> onSuggestionDeleted(suggestion) }
+            onSuggestionDelete = { suggestion -> onSuggestionDeleted(suggestion) },
+            onDeleteAllForField = { fieldIdentifier -> 
+                // Tüm öneriler siliniyor
+                Timber.d("'$fieldIdentifier' alanı için tüm öneriler siliniyor")
+                
+                // Tüm önerileri silme işlemi için onDeleteAllSuggestions'ı çağır
+                onDeleteAllSuggestions?.invoke(fieldIdentifier)
+                
+                // UI'ı güncelle, adaptördeki tüm öğeleri temizle
+                suggestionAdapter?.removeAllSuggestions()
+                
+                // Boş durum mesajını göster
+                recyclerView?.visibility = View.GONE
+                emptyStateView?.visibility = View.VISIBLE
+                emptyStateView?.text = "Tüm öneriler silindi"
+            }
         )
         
         // Adapter'ı RecyclerView'a ata

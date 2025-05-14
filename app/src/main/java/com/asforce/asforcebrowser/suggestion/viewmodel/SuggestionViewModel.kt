@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -154,6 +155,27 @@ class SuggestionViewModel @Inject constructor(
     fun deleteSuggestion(suggestion: SuggestionEntity) {
         viewModelScope.launch {
             repository.deleteSuggestion(suggestion.id)
+        }
+    }
+    
+    /**
+     * Belirli bir alan için tüm önerileri siler
+     * 
+     * @param fieldIdentifier Alan kimliği
+     */
+    fun deleteAllSuggestionsForField(fieldIdentifier: String) {
+        if (fieldIdentifier.isBlank()) {
+            return
+        }
+        
+        viewModelScope.launch {
+            try {
+                Timber.d("'$fieldIdentifier' alanı için tüm öneriler siliniyor")
+                repository.clearSuggestionsForField(fieldIdentifier)
+                Timber.d("'$fieldIdentifier' alanı için tüm öneriler silindi")
+            } catch (e: Exception) {
+                Timber.e(e, "Önerileri silme hatası: ${e.message}")
+            }
         }
     }
 }

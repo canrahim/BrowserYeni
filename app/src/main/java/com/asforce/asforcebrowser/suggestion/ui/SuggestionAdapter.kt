@@ -1,5 +1,6 @@
 package com.asforce.asforcebrowser.suggestion.ui
 
+import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
 import android.view.LayoutInflater
@@ -19,11 +20,13 @@ import com.google.android.material.card.MaterialCardView
  * @param context Context
  * @param onSuggestionClick Öneri tıklandığında çağrılacak lambda
  * @param onSuggestionDelete Öneri silindiğinde çağrılacak lambda
+ * @param onDeleteAllForField Bir alan için tüm önerileri silme lambda
  */
 class SuggestionAdapter(
     private val context: Context,
     private val onSuggestionClick: (SuggestionEntity) -> Unit,
-    private val onSuggestionDelete: (SuggestionEntity) -> Unit
+    private val onSuggestionDelete: (SuggestionEntity) -> Unit,
+    private val onDeleteAllForField: ((String) -> Unit)? = null
 ) : RecyclerView.Adapter<SuggestionAdapter.SuggestionViewHolder>() {
 
     // Öneri listesi
@@ -70,24 +73,70 @@ class SuggestionAdapter(
                 // Silme işlemi başlatıldı
                 val position = adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    // Silme callbackini çağır
-                    onSuggestionDelete(suggestion)
-                    
-                    // Küçük bir geri bildirim göster
-                    Toast.makeText(context, "Öneri silindi", Toast.LENGTH_SHORT).show()
+                    // Silme onayı sor
+                    showDeleteConfirmationDialog(suggestion)
                 }
             }
             
-            // Uzun basma olayını ayarla
+            // Uzun basma olayını ayarla - tüm önerileri silme seçeneği
             cardView.setOnLongClickListener {
                 val position = adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    onSuggestionDelete(suggestion)
-                    Toast.makeText(context, "Öneri silindi", Toast.LENGTH_SHORT).show()
+                    showDeleteOptionsDialog(suggestion)
                 }
                 true
             }
         }
+    }
+    
+    /**
+     * Silme onayı diyaloğunu göster
+     */
+    private fun showDeleteConfirmationDialog(suggestion: SuggestionEntity) {
+        AlertDialog.Builder(context)
+            .setTitle("Öneri Silme")
+            .setMessage("\"${suggestion.value}\" önerisini silmek istediğinizden emin misiniz?")
+            .setPositiveButton("Sil") { _, _ ->
+                // Silme işlemini gerçekleştir
+                onSuggestionDelete(suggestion)
+                Toast.makeText(context, "Öneri silindi", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("İptal", null)
+            .create()
+            .show()
+    }
+    
+    /**
+     * Silme seçenekleri diyaloğunu göster (tek öneri veya tüm öneriler)
+     */
+    private fun showDeleteOptionsDialog(suggestion: SuggestionEntity) {
+        val options = arrayOf("Bu öneriyi sil", "Bu alan için tüm önerileri sil")
+        
+        AlertDialog.Builder(context)
+            .setTitle("Öneri Silme Seçenekleri")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        // Tek öneriyi sil
+                        showDeleteConfirmationDialog(suggestion)
+                    }
+                    1 -> {
+                        // Alan için tüm önerileri silme onayı
+                        AlertDialog.Builder(context)
+                            .setTitle("Tüm Önerileri Sil")
+                            .setMessage("\"${suggestion.fieldIdentifier}\" alanı için TÜM önerileri silmek istediğinizden emin misiniz?")
+                            .setPositiveButton("Tümünü Sil") { _, _ ->
+                                onDeleteAllForField?.invoke(suggestion.fieldIdentifier)
+                                Toast.makeText(context, "Tüm öneriler silindi", Toast.LENGTH_SHORT).show()
+                            }
+                            .setNegativeButton("İptal", null)
+                            .create()
+                            .show()
+                    }
+                }
+            }
+            .create()
+            .show()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SuggestionViewHolder {
@@ -127,5 +176,14 @@ class SuggestionAdapter(
             suggestions = newList
             notifyItemRemoved(position)
         }
+    }
+    
+    /**
+     * Tüm önerileri listeden kaldır
+     */
+    fun removeAllSuggestions() {
+        val itemCount = suggestions.size
+        suggestions = emptyList()
+        notifyItemRangeRemoved(0, itemCount)
     }
 }

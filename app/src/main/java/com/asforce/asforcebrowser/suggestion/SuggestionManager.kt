@@ -217,6 +217,12 @@ class SuggestionManager(
         SuggestionPanel.setSuggestionDeletedCallback { suggestion ->
             viewModel.deleteSuggestion(suggestion)
         }
+        
+        // Tüm öneriler silindiğinde callback
+        SuggestionPanel.setDeleteAllSuggestionsCallback { fieldIdentifier ->
+            Timber.d("'$fieldIdentifier' alanı için tüm öneriler siliniyor")
+            viewModel.deleteAllSuggestionsForField(fieldIdentifier)
+        }
     }
     
     /**
