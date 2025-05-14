@@ -248,9 +248,15 @@ class SuggestionPanel(
         if (suggestions.isEmpty()) {
             recyclerView?.visibility = View.GONE
             emptyStateView?.visibility = View.VISIBLE
+            emptyStateView?.text = "Bu alan için öneri bulunamadı"
         } else {
             recyclerView?.visibility = View.VISIBLE
             emptyStateView?.visibility = View.GONE
+            
+            // Günlüğe öneri bilgilerini yaz
+            suggestions.forEach { suggestion ->
+                Timber.d("Öneri gösteriliyor: '${suggestion.value}', ID: ${suggestion.id}")
+            }
             
             // Adapter'ı güncelle
             suggestionAdapter?.updateSuggestions(suggestions)
@@ -293,7 +299,16 @@ class SuggestionPanel(
      * @param suggestion Silinecek öneri
      */
     private fun onSuggestionDeleted(suggestion: SuggestionEntity) {
+        // Önerileri görünümden kaldır
+        suggestionAdapter?.removeSuggestion(suggestion)
+        
         // Silme callback'ini çağır
         onSuggestionDeleted?.invoke(suggestion)
+        
+        // Eğer tüm öneriler silindiyse boş durum görünümünü göster
+        if (suggestionAdapter?.itemCount == 0) {
+            recyclerView?.visibility = View.GONE
+            emptyStateView?.visibility = View.VISIBLE
+        }
     }
 }

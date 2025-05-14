@@ -8,7 +8,7 @@
     <color name="suggestion_panel_divider_color">#E0E0E0</color>
     
     <!-- Öneri Öğesi Renkleri -->
-    <color name="suggestion_item_background">#EEEEEE</color>
-    <color name="suggestion_item_text_color">#212121</color>
+    <color name="suggestion_item_background">#FFFFFF</color>
+    <color name="suggestion_item_text_color">#000000</color>
     <color name="suggestion_item_icon_color">#757575</color>
 </resources>
