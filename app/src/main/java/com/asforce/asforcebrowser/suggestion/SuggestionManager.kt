@@ -251,7 +251,61 @@ class SuggestionManager(
      * @param webView Odak kaybedilen alan içeren WebView
      */
     private fun onInputFieldBlurred(fieldIdentifier: String, webView: WebView) {
-        Timber.d("Input blurred: $fieldIdentifier")
+        Timber.d("Input blurred: $fieldIdentifier - değer almaya çalışıyorum")
+        
+        try {
+            // Daha basit bir JavaScript kodu kullanarak değeri alalım
+            webView.evaluateJavascript("""
+                (function() {
+                    try {
+                        // Önce document.getElementById ile deneyelim
+                        var input = document.getElementById('${fieldIdentifier}');
+                        
+                        // Yoksa document.getElementsByName ile deneyelim
+                        if (!input) {
+                            var inputs = document.getElementsByName('${fieldIdentifier}');
+                            if (inputs && inputs.length > 0) {
+                                input = inputs[0];
+                            }
+                        }
+                        
+                        // Yoksa querySelector ile deneyelim
+                        if (!input) {
+                            input = document.querySelector('[id="${fieldIdentifier}"], [name="${fieldIdentifier}"]');
+                        }
+                        
+                        // Eğer input bulunduysa değerini döndür
+                        if (input) {
+                            return input.value || '';
+                        }
+                        
+                        return '';
+                    } catch(e) {
+                        console.error('Error getting field value:', e);
+                        return '';
+                    }
+                })();
+            """.trimIndent()) { valueWithQuotes ->
+                try {
+                    // JavaScript'ten dönen değeri temizle (tırnak işaretlerini kaldır)
+                    val value = valueWithQuotes.replace("\"", "")
+                    Timber.d("Alan değeri alındı: '$value'")
+                    
+                    // Değer anlamlıysa (boş değilse ve yeterince uzunsa) öneri olarak kaydet
+                    if (value.isNotBlank() && value.length > 1) {
+                        Timber.d("Alan odağı kaybedildi, son değer kaydediliyor: $value")
+                        viewModel.addSuggestion(fieldIdentifier, value)
+                        Timber.d("Değer kaydedildi: $fieldIdentifier = $value")
+                    } else {
+                        Timber.d("Boş veya çok kısa değer, kaydedilmedi: '$value'")
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Değeri işlerken hata oluştu: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Alan değerini alırken hata oluştu: ${e.message}")
+        }
         
         // Odaklı alanı temizle
         if (viewModel.currentField.value == fieldIdentifier) {
@@ -268,10 +322,8 @@ class SuggestionManager(
     private fun onInputValueChanged(fieldIdentifier: String, value: String) {
         Timber.d("Input value changed: $fieldIdentifier, value: $value")
         
-        // Değer boş değilse ve yeterince uzunsa potansiyel öneri olarak kaydet
-        if (value.isNotBlank() && value.length > 2) {
-            viewModel.addSuggestion(fieldIdentifier, value)
-        }
+        // NOT: Yazmaya devam edilirken öneri kaydetmiyoruz
+        // Öneriler sadece alan terk edildiğinde (blur) veya form gönderildiğinde kaydedilecek
     }
     
     /**

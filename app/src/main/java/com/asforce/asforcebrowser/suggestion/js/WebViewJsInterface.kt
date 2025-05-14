@@ -82,12 +82,20 @@ class WebViewJsInterface(
         Timber.d(">> JavaScript to Native: Form submitted, saving value: $fieldIdentifier, value: $value, type: $fieldType")
         if (value.isNotEmpty()) {
             try {
-                viewModel.addSuggestion(fieldIdentifier, value, fieldType)
-                Timber.d(">> Suggestion added successfully for field: $fieldIdentifier")
+                // Değer anlamlıysa kaydet 
+                if (value.length > 1) {
+                    Timber.d(">> Form değeri kaydediliyor: $fieldIdentifier = $value")
+                    viewModel.addSuggestion(fieldIdentifier, value, fieldType)
+                    Timber.d(">> Suggestion added successfully for field: $fieldIdentifier")
+                } else {
+                    Timber.d(">> Değer çok kısa, kaydedilmiyor: $value")
+                }
             } catch (e: Exception) {
                 Timber.e("Error in saveSubmittedValue: ${e.message}")
                 e.printStackTrace()
             }
+        } else {
+            Timber.d(">> Boş değer, kaydedilmiyor")
         }
     }
     

@@ -66,17 +66,39 @@ object JsInjectionScript {
                     // Blur event listener
                     input.addEventListener('blur', function(e) {
                         var fieldIdentifier = window.asforceInputObserver.getInputIdentifier(this);
+                        var fieldValue = this.value || '';
+                        
+                        console.log('[Asforce] Input blur event for: ' + fieldIdentifier + ', value: ' + fieldValue);
+                        
+                        // Değer kontrolü
+                        if (fieldValue && fieldValue.trim() !== '') {
+                            console.log('[Asforce] Sending blur event with value: ' + fieldValue);
+                            
+                            // Eğer değer anlamlıysa native tarafa bildir
+                            try {
+                                // Alan tanımlayıcısı ile değeri de doğrudan kaydedebiliriz
+                                window.AsforceSuggestionBridge.saveSubmittedValue(fieldIdentifier, fieldValue, this.type || 'text');
+                                
+                                // Ayrıca normal blur olayını da bildirelim
+                                window.AsforceSuggestionBridge.onInputBlurred(fieldIdentifier);
+                            } catch (error) {
+                                console.error('Error notifying blur event:', error);
+                                window.AsforceSuggestionBridge.logError('Blur event error: ' + error.message);
+                            }
+                        } else {
+                            console.log('[Asforce] Empty value, only sending blur event');
+                            
+                            // Boş değer için sadece blur bildir
+                            try {
+                                window.AsforceSuggestionBridge.onInputBlurred(fieldIdentifier);
+                            } catch (error) {
+                                console.error('Error notifying blur event:', error);
+                                window.AsforceSuggestionBridge.logError('Blur event error: ' + error.message);
+                            }
+                        }
                         
                         // Mevcut odaklı input'u temizle
                         window.asforceInputObserver.currentFocusedInput = null;
-                        
-                        // Native tarafa bildir
-                        try {
-                            window.AsforceSuggestionBridge.onInputBlurred(fieldIdentifier);
-                        } catch (error) {
-                            console.error('Error notifying blur event:', error);
-                            window.AsforceSuggestionBridge.logError('Blur event error: ' + error.message);
-                        }
                     });
                     
                     // Input event listener - değer değiştiğinde
