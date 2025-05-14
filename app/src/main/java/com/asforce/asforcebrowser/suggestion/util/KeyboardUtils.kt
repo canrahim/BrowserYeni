@@ -70,21 +70,27 @@ object KeyboardUtils {
                 // Klavye yüksekliği (px olarak)
                 val keyboardHeight = screenHeight - r.bottom
                 
-                // Klavye görünür mü kontrol et (yüksekliği ekranın %10'undan büyükse)
-                // Daha düşük bir eşik değeri kullanarak daha hızlı algılama
-                val keyboardVisibilityThreshold = screenHeight * 0.10
+                // Klavye görünür mü kontrol et (yüksekliği ekranın %5'inden büyükse)
+                // Daha düşük eşik değeriyle daha duyarlı hale getirdik
+                val keyboardVisibilityThreshold = screenHeight * 0.05
                 val isKeyboardNowVisible = keyboardHeight > keyboardVisibilityThreshold
                 
                 // Durum değiştiyse bildir
                 if (isKeyboardVisible != isKeyboardNowVisible) {
                     isKeyboardVisible = isKeyboardNowVisible
                     
-                    // Durum değişikliğini bildir
-                    notifyKeyboardVisibilityChanged(isKeyboardVisible, keyboardHeight)
-                    
-                    // Klavye görünür hale geldiyse yüksekliği kaydet
-                    if (isKeyboardVisible && keyboardHeight > 100) {
-                        lastKeyboardHeight = keyboardHeight
+                    // Klavye kapandığında hemen bildir
+                    if (!isKeyboardVisible) {
+                        Timber.d("Klavye kapandı olarak tespit edildi")
+                        notifyKeyboardVisibilityChanged(false, 0)
+                    } else {
+                        // Durum değişikliğini bildir
+                        notifyKeyboardVisibilityChanged(isKeyboardVisible, keyboardHeight)
+                        
+                        // Klavye görünür hale geldiyse yüksekliği kaydet
+                        if (keyboardHeight > 100) {
+                            lastKeyboardHeight = keyboardHeight
+                        }
                     }
                     
                     Timber.d("Klavye durumu değişti: $isKeyboardVisible, yükseklik: $keyboardHeight")

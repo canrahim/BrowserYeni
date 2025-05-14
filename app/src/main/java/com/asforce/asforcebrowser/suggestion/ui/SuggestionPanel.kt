@@ -145,10 +145,8 @@ class SuggestionPanel(
         // Adapter'ı RecyclerView'a ata
         recyclerView?.adapter = suggestionAdapter
         
-        // Kapat butonunu ayarla
-        panelView?.findViewById<ImageButton>(R.id.btnCancelPanel)?.setOnClickListener {
-            hidePanel()
-        }
+        // Kapatma butonunu gizle
+        panelView?.findViewById<ImageButton>(R.id.btnCancelPanel)?.visibility = View.GONE
     }
     
     /**
@@ -233,14 +231,33 @@ class SuggestionPanel(
     }
     
     /**
-     * Paneli gizler
+     * Panel görünür mü?
+     * 
+     * @return Panel görünür mü
      */
-    fun hidePanel() {
+    fun isVisible(): Boolean {
+        return isVisible
+    }
+    
+    /**
+     * Paneli gizler
+     * 
+     * @param forceHide Animasyon olmadan zorla gizle
+     */
+    fun hidePanel(forceHide: Boolean = false) {
         if (!isVisible || panelView == null) {
             return
         }
         
-        // Aşağı kayma animasyonu
+        if (forceHide) {
+            // Animasyon olmadan hemen kaldır
+            rootView.removeView(panelView)
+            isVisible = false
+            Timber.d("Panel zorla gizlendi")
+            return
+        }
+        
+        // Normal animasyonlu kapatma
         val slideDown = AnimationUtils.loadAnimation(context, R.anim.slide_down)
         
         slideDown.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
@@ -257,7 +274,7 @@ class SuggestionPanel(
         
         panelView?.startAnimation(slideDown)
         
-        Timber.d("Panel gizlendi")
+        Timber.d("Panel animasyon ile gizlendi")
     }
     
     /**

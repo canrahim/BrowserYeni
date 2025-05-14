@@ -348,6 +348,7 @@ class SuggestionManager(
      */
     override fun onKeyboardVisibilityChanged(isVisible: Boolean, keyboardHeight: Int) {
         try {
+            Timber.d("Klavye görünürlüğü değişti: $isVisible, yükseklik: $keyboardHeight")
             keyboardVisible = isVisible
             
             // UI işlemlerini ana thread'de yap
@@ -359,8 +360,14 @@ class SuggestionManager(
                         showSuggestionPanelForField(currentField)
                     }
                 } else {
-                    // Klavye gizlendiğinde paneli de gizle
-                    suggestionPanel.hidePanel()
+                    // Klavye gizlendiğinde her zaman paneli gizle
+                    if (suggestionPanel.isVisible()) {
+                        Timber.d("Klavye kapandı, panel kapatılıyor")
+                        suggestionPanel.hidePanel(true) // Zorla kapat parametresi eklenecek
+                        
+                        // Panel kapatma durumunu ViewModel'e bildir
+                        viewModel.setPanelShowing(false)
+                    }
                 }
             }
         } catch (e: Exception) {
