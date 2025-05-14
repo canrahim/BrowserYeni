@@ -41,6 +41,8 @@ import com.asforce.asforcebrowser.util.performance.PerformanceOptimizer
 import com.asforce.asforcebrowser.util.performance.ScrollOptimizer
 import com.asforce.asforcebrowser.util.performance.menu.MenuOptimizer
 import com.asforce.asforcebrowser.download.WebViewDownloadHelper
+import com.asforce.asforcebrowser.suggestion.SuggestionManager
+import timber.log.Timber
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -67,6 +69,9 @@ class WebViewFragment : Fragment() {
     private lateinit var pageLoadOptimizer: PageLoadOptimizer
     private lateinit var menuOptimizer: MenuOptimizer
     private lateinit var webViewDownloadHelper: WebViewDownloadHelper
+
+    // Öneri yöneticisi
+    private var suggestionManager: SuggestionManager? = null
 
     // Dosya seçimi için değişkenler
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
@@ -286,6 +291,9 @@ class WebViewFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Öneri sistemini başlat
+        initSuggestionManager()
+
         // WebView'in zaten yapılandırılıp yapılandırılmadığını kontrol et
         if (!binding.webView.settings.javaScriptEnabled) {
             setupWebView()
@@ -376,6 +384,10 @@ class WebViewFragment : Fragment() {
                             view.postDelayed({
                                 menuOptimizer.fixSlowMenuResponse(view)
                             }, 500)
+                            
+                            // Öneri sistemi için JavaScript enjekte et
+                            injectSuggestionScripts(view)
+                            Timber.d("onPageFinished: Suggestion scripts injected for URL: $url")
                         }
                     }
 
@@ -405,6 +417,12 @@ class WebViewFragment : Fragment() {
 
             // WebChromeClient ata
             webChromeClient = this@WebViewFragment.webChromeClient
+            
+            // Öneri sistemi için ayarla
+            if (suggestionManager == null) {
+                initSuggestionManager()
+            }
+            suggestionManager?.setupWebView(this, tabId.toString())
 
             // SwipeRefreshLayout ile entegre et
             setupWithSwipeRefresh(binding.swipeRefresh)
@@ -604,7 +622,9 @@ class WebViewFragment : Fragment() {
                                         true
                                     }
                                     4 -> { // Görseli kaydet
-                                        webViewDownloadHelper.handleImageDownload(url, webView)
+                                        webView?.let { safeWebView ->
+                                            webViewDownloadHelper.handleImageDownload(url, safeWebView)
+                                        }
                                         true
                                     }
                                     5 -> { // Görsel URL'sini kopyala
@@ -667,7 +687,9 @@ class WebViewFragment : Fragment() {
                                         true
                                     }
                                     4 -> { // Görseli kaydet
-                                        webViewDownloadHelper.handleImageDownload(url, webView)
+                                        webView?.let { safeWebView ->
+                                            webViewDownloadHelper.handleImageDownload(url, safeWebView)
+                                        }
                                         true
                                     }
                                     5 -> { // Görsel URL'sini kopyala
@@ -733,6 +755,7 @@ class WebViewFragment : Fragment() {
 
     /**
      * WebView getter - WebView için dışarıdan erişim sağlar
+     * @return WebView nesnesi veya null (binding boş ise)
      */
     fun getWebView(): WebView? {
         return if (_binding != null) binding.webView else null
@@ -988,6 +1011,9 @@ class WebViewFragment : Fragment() {
         if (this::webViewDownloadHelper.isInitialized) {
             webViewDownloadHelper.cleanup()
         }
+        
+        // Öneri sistemini temizle
+        suggestionManager?.onTabClosed(tabId.toString())
 
         // FragmentCache kullanıldığından, sadece aktivite sonlandığında kaynakları temizle
         if (activity?.isFinishing == true) {
@@ -1000,6 +1026,138 @@ class WebViewFragment : Fragment() {
             } catch (e: Exception) {
                 // Silent catch for production
             }
+        }
+    }
+
+    /**
+     * Öneri yöneticisini başlat
+     */
+    private fun initSuggestionManager() {
+        if (suggestionManager == null) {
+            val activity = requireActivity()
+            val rootView = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+            
+            if (rootView != null) {
+                try {
+                    suggestionManager = SuggestionManager(activity, rootView)
+                    Timber.d("SuggestionManager initialized successfully")
+                } catch (e: Exception) {
+                    Timber.e("SuggestionManager initialization failed: ${e.message}")
+                    e.printStackTrace()
+                }
+            } else {
+                Timber.e("Root view not found for SuggestionManager")
+            }
+        }
+    }
+    
+    /**
+     * WebView için öneri sistemini ayarla
+     * 
+     * @param webView WebView instance
+     */
+    private fun setupSuggestionSystem(webView: WebView?) {
+        try {
+            if (suggestionManager == null) {
+                Timber.d("setupSuggestionSystem: SuggestionManager null, initializing")
+                initSuggestionManager()
+            }
+            
+            if (webView != null) {
+                if (suggestionManager != null) {
+                    Timber.d("Setting up suggestion system for WebView, tabId: $tabId")
+                    suggestionManager?.setupWebView(webView, tabId.toString())
+                    
+                    // WebView'in JavaScript etkin olduğundan emin ol
+                    if (!webView.settings.javaScriptEnabled) {
+                        Timber.w("JavaScript was not enabled on WebView! Enabling it now.")
+                        webView.settings.javaScriptEnabled = true
+                    }
+                } else {
+                    Timber.e("setupSuggestionSystem: SuggestionManager is still null after initialization")
+                }
+            } else {
+                Timber.e("setupSuggestionSystem: WebView is null")
+            }
+        } catch (e: Exception) {
+            Timber.e("Error in setupSuggestionSystem: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * Sayfa yüklendiğinde JavaScript enjekte et
+     * 
+     * @param webView WebView instance
+     */
+    private fun injectSuggestionScripts(webView: WebView?) {
+        if (webView == null) {
+            Timber.e("injectSuggestionScripts: WebView is null")
+            return
+        }
+        
+        try {
+            // Önce WebView'i SuggestionManager ile eşleştir
+            setupSuggestionSystem(webView)
+            
+            // JavaScript kodu enjekte et - input alanlarını izle
+            val script = """
+                (function() {
+                    if (window.asforceInputObserver) {
+                        window.asforceInputObserver.observeAllInputs();
+                        console.log("AsforceInputObserver mevcut, gözlem başlatıldı");
+                        return "Observer mevcut ve yeniden başlatıldı";
+                    } else {
+                        // Input observer yüklenmemiş, ilk kez yüklemeyi dene
+                        ${com.asforce.asforcebrowser.suggestion.js.JsInjectionScript.INPUT_OBSERVER_SCRIPT}
+                        console.log("AsforceInputObserver oluşturuldu ve gözlem başlatıldı");
+                        return "Observer yeni oluşturuldu";
+                    }
+                })();
+            """.trimIndent()
+            
+            // JavaScript'i çalıştır ve hata ayıklama bilgisini logla
+            webView.evaluateJavascript(script) { result ->
+                Timber.d("Suggestion scripts injected, result: $result")
+            }
+            
+            // Kısa bir bekleme sonrası JS Interface'in doğru çalıştığını kontrol et
+            webView.postDelayed({
+                webView.evaluateJavascript("""
+                    (function() {
+                        if (window.AsforceSuggestionBridge) {
+                            console.log("AsforceSuggestionBridge mevcut");
+                            return "Köprü hazır";
+                        } else {
+                            console.log("AsforceSuggestionBridge eksik!");
+                            return "Köprü eksik";
+                        }
+                    })();
+                """.trimIndent()) { result ->
+                    Timber.d("SuggestionBridge check: $result")
+                    
+                    // Köprü eksikse SuggestionManager'ı yeniden başlat
+                    if (result.contains("eksik")) {
+                        Timber.w("Köprü eksik, SuggestionManager yeniden ayarlanıyor")
+                        
+                        // SuggestionManager'ı sıfırla ve yeniden kur
+                        if (suggestionManager != null) {
+                            suggestionManager?.onTabClosed(tabId.toString()) // Temizlik yap
+                            suggestionManager = null
+                            initSuggestionManager()
+                            setupSuggestionSystem(webView)
+                            
+                            // Tekrar JavaScript enjekte et
+                            webView.evaluateJavascript(script) { innerResult ->
+                                Timber.d("Suggestion scripts re-injected, result: $innerResult")
+                            }
+                        }
+                    }
+                }
+            }, 300) // Köprü kontrolünü kısa bir gecikme ile yap
+        } catch (e: Exception) {
+            Timber.e("Error injecting suggestion scripts: ${e.message}")
+            e.printStackTrace()
         }
     }
 

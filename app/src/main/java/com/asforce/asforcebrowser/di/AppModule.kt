@@ -8,6 +8,8 @@ import com.asforce.asforcebrowser.data.repository.TabHistoryRepositoryImpl
 import com.asforce.asforcebrowser.data.repository.TabRepositoryImpl
 import com.asforce.asforcebrowser.domain.repository.TabHistoryRepository
 import com.asforce.asforcebrowser.domain.repository.TabRepository
+import com.asforce.asforcebrowser.suggestion.data.local.SuggestionDao
+import com.asforce.asforcebrowser.suggestion.data.repository.SuggestionRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -54,4 +56,7 @@ object AppModule {
     fun provideTabHistoryRepository(tabHistoryDao: TabHistoryDao): TabHistoryRepository {
         return TabHistoryRepositoryImpl(tabHistoryDao)
     }
+    
+    // SuggestionDao ve SuggestionRepository sağlayıcıları SuggestionModule'a taşındı
+    // Bu modüldeki çakışmayı önlemek için
 }

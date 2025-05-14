@@ -16,7 +16,7 @@ import com.asforce.asforcebrowser.data.model.TabHistory
  */
 @Database(
     entities = [Tab::class, TabHistory::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class BrowserDatabase : RoomDatabase() {

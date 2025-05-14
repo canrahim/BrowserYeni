@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Öneri Paneli Renkleri -->
+    <color name="suggestion_panel_background">#F5F5F5</color>
+    <color name="suggestion_panel_title_color">#616161</color>
+    <color name="suggestion_panel_icon_color">#757575</color>
+    <color name="suggestion_panel_empty_text_color">#9E9E9E</color>
+    
+    <!-- Öneri Öğesi Renkleri -->
+    <color name="suggestion_item_background">#EEEEEE</color>
+    <color name="suggestion_item_text_color">#212121</color>
+    <color name="suggestion_item_icon_color">#757575</color>
+</resources>
