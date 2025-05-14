@@ -145,11 +145,13 @@ class SuggestionManager(
     private fun injectJavaScript(webView: WebView) {
         try {
             // Sayfa yükleme işleminden sonra JavaScript kodunu enjekte et
-            webView.evaluateJavascript(JsInjectionScript.INPUT_OBSERVER_SCRIPT) { result ->
-                Timber.d("JavaScript injection result: $result")
-                
-                // Köprü kontrollerini yap
-                verifyInjectionSuccess(webView)
+            activity.runOnUiThread {
+                webView.evaluateJavascript(JsInjectionScript.INPUT_OBSERVER_SCRIPT) { result ->
+                    Timber.d("JavaScript injection result: $result")
+                    
+                    // Köprü kontrollerini yap
+                    verifyInjectionSuccess(webView)
+                }
             }
             
             Timber.d("JavaScript injection attempted for WebView")
@@ -166,35 +168,39 @@ class SuggestionManager(
      */
     private fun verifyInjectionSuccess(webView: WebView) {
         // JavaScript köprüsünün doğru çalıştığını kontrol et
-        webView.evaluateJavascript("""
-            (function() {
-                var result = {
-                    observer: window.asforceInputObserver ? true : false,
-                    bridge: window.AsforceSuggestionBridge ? true : false
-                };
-                return JSON.stringify(result);
-            })();
-        """.trimIndent()) { result ->
-            try {
-                // JSON sonuç temizle ve parse et
-                val cleanResult = result.replace("\"", "").replace("\\\\", "\\")
-                    .replace("\\{", "{").replace("\\}", "}")
-                val isObserverLoaded = cleanResult.contains("observer:true")
-                val isBridgeLoaded = cleanResult.contains("bridge:true")
-                
-                Timber.d("Injection verification - Observer: $isObserverLoaded, Bridge: $isBridgeLoaded")
-                
-                if (!isObserverLoaded || !isBridgeLoaded) {
-                    Timber.w("JavaScript injection partially failed: $cleanResult")
+        activity.runOnUiThread {
+            webView.evaluateJavascript("""
+                (function() {
+                    var result = {
+                        observer: window.asforceInputObserver ? true : false,
+                        bridge: window.AsforceSuggestionBridge ? true : false
+                    };
+                    return JSON.stringify(result);
+                })();
+            """.trimIndent()) { result ->
+                try {
+                    // JSON sonuç temizle ve parse et
+                    val cleanResult = result.replace("\"", "").replace("\\\\", "\\")
+                        .replace("\\{", "{").replace("\\}", "}")
+                    val isObserverLoaded = cleanResult.contains("observer:true")
+                    val isBridgeLoaded = cleanResult.contains("bridge:true")
                     
-                    // Enjeksiyon başarısız oldu, tekrar dene
-                    webView.postDelayed({
-                        Timber.d("Retrying JavaScript injection...")
-                        webView.evaluateJavascript(JsInjectionScript.INPUT_OBSERVER_SCRIPT, null)
-                    }, 500)
+                    Timber.d("Injection verification - Observer: $isObserverLoaded, Bridge: $isBridgeLoaded")
+                    
+                    if (!isObserverLoaded || !isBridgeLoaded) {
+                        Timber.w("JavaScript injection partially failed: $cleanResult")
+                        
+                        // Enjeksiyon başarısız oldu, tekrar dene
+                        webView.postDelayed({
+                            Timber.d("Retrying JavaScript injection...")
+                            activity.runOnUiThread {
+                                webView.evaluateJavascript(JsInjectionScript.INPUT_OBSERVER_SCRIPT, null)
+                            }
+                        }, 500)
+                    }
+                } catch (e: Exception) {
+                    Timber.e("Error parsing injection verification result: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Timber.e("Error parsing injection verification result: ${e.message}")
             }
         }
     }
@@ -255,53 +261,56 @@ class SuggestionManager(
         Timber.d("Input blurred: $fieldIdentifier - değer almaya çalışıyorum")
         
         try {
-            // Daha basit bir JavaScript kodu kullanarak değeri alalım
-            webView.evaluateJavascript("""
-                (function() {
-                    try {
-                        // Önce document.getElementById ile deneyelim
-                        var input = document.getElementById('${fieldIdentifier}');
-                        
-                        // Yoksa document.getElementsByName ile deneyelim
-                        if (!input) {
-                            var inputs = document.getElementsByName('${fieldIdentifier}');
-                            if (inputs && inputs.length > 0) {
-                                input = inputs[0];
+            // WebView metodları UI thread'inde çağrılmalı
+            activity.runOnUiThread {
+                // Daha basit bir JavaScript kodu kullanarak değeri alalım
+                webView.evaluateJavascript("""
+                    (function() {
+                        try {
+                            // Önce document.getElementById ile deneyelim
+                            var input = document.getElementById('${fieldIdentifier}');
+                            
+                            // Yoksa document.getElementsByName ile deneyelim
+                            if (!input) {
+                                var inputs = document.getElementsByName('${fieldIdentifier}');
+                                if (inputs && inputs.length > 0) {
+                                    input = inputs[0];
+                                }
                             }
+                            
+                            // Yoksa querySelector ile deneyelim
+                            if (!input) {
+                                input = document.querySelector('[id="${fieldIdentifier}"], [name="${fieldIdentifier}"]');
+                            }
+                            
+                            // Eğer input bulunduysa değerini döndür
+                            if (input) {
+                                return input.value || '';
+                            }
+                            
+                            return '';
+                        } catch(e) {
+                            console.error('Error getting field value:', e);
+                            return '';
                         }
+                    })();
+                """.trimIndent()) { valueWithQuotes ->
+                    try {
+                        // JavaScript'ten dönen değeri temizle (tırnak işaretlerini kaldır)
+                        val value = valueWithQuotes.replace("\"", "")
+                        Timber.d("Alan değeri alındı: '$value'")
                         
-                        // Yoksa querySelector ile deneyelim
-                        if (!input) {
-                            input = document.querySelector('[id="${fieldIdentifier}"], [name="${fieldIdentifier}"]');
+                        // Değer anlamlıysa (boş değilse ve yeterince uzunsa) öneri olarak kaydet
+                        if (value.isNotBlank() && value.length > 1) {
+                            Timber.d("Alan odağı kaybedildi, son değer kaydediliyor: $value")
+                            viewModel.addSuggestion(fieldIdentifier, value)
+                            Timber.d("Değer kaydedildi: $fieldIdentifier = $value")
+                        } else {
+                            Timber.d("Boş veya çok kısa değer, kaydedilmedi: '$value'")
                         }
-                        
-                        // Eğer input bulunduysa değerini döndür
-                        if (input) {
-                            return input.value || '';
-                        }
-                        
-                        return '';
-                    } catch(e) {
-                        console.error('Error getting field value:', e);
-                        return '';
+                    } catch (e: Exception) {
+                        Timber.e(e, "Değeri işlerken hata oluştu: ${e.message}")
                     }
-                })();
-            """.trimIndent()) { valueWithQuotes ->
-                try {
-                    // JavaScript'ten dönen değeri temizle (tırnak işaretlerini kaldır)
-                    val value = valueWithQuotes.replace("\"", "")
-                    Timber.d("Alan değeri alındı: '$value'")
-                    
-                    // Değer anlamlıysa (boş değilse ve yeterince uzunsa) öneri olarak kaydet
-                    if (value.isNotBlank() && value.length > 1) {
-                        Timber.d("Alan odağı kaybedildi, son değer kaydediliyor: $value")
-                        viewModel.addSuggestion(fieldIdentifier, value)
-                        Timber.d("Değer kaydedildi: $fieldIdentifier = $value")
-                    } else {
-                        Timber.d("Boş veya çok kısa değer, kaydedilmedi: '$value'")
-                    }
-                } catch (e: Exception) {
-                    Timber.e(e, "Değeri işlerken hata oluştu: ${e.message}")
                 }
             }
         } catch (e: Exception) {
